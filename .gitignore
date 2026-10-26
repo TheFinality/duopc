@@ -36,3 +36,5 @@ Config/Local.xcconfig
 windows/DuoPCGateway/bin/
 windows/DuoPCGateway/obj/
 dist/
+windows/DuoPCStreamer/bin/
+windows/DuoPCStreamer/obj/
