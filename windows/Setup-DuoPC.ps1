@@ -35,6 +35,10 @@
 .PARAMETER Pair
     Only pair another phone (or pair again): shows a new QR code. Changes nothing else.
 
+.PARAMETER Update
+    Rebuilds and reinstalls the gateway and video streamer from this folder and adds FFmpeg, keeping
+    the pairings, port and passwords. Use it after pulling a new version of DuoPC.
+
 .PARAMETER Check
     Changes nothing. Checks TightVNC, the gateway, the firewall, and that both answer as they should.
 
@@ -47,6 +51,7 @@ param(
     [Parameter(ParameterSetName = 'Install')] [ValidateRange(1, 65535)] [int] $Port = 5960,
     [Parameter(ParameterSetName = 'Install')] [Parameter(ParameterSetName = 'Pair')] [ValidateRange(1, 65535)] [int] $ExternalPort,
     [Parameter(ParameterSetName = 'Pair')] [switch] $Pair,
+    [Parameter(ParameterSetName = 'Update')] [switch] $Update,
     [Parameter(ParameterSetName = 'Check')] [switch] $Check,
     [Parameter(ParameterSetName = 'Uninstall')] [switch] $Uninstall
 )
@@ -533,6 +538,19 @@ function Invoke-Uninstall {
 switch ($PSCmdlet.ParameterSetName) {
     'Check' { Invoke-Check }
     'Uninstall' { Invoke-Uninstall }
+    'Update' {
+        Assert-Admin
+        if (-not (Test-Path $GatewayExe)) { throw 'DuoPC isn''t installed yet: run this script without -Update first.' }
+        # Keep the gateway's port: Install-Gateway re-applies $Port.
+        $configPath = Join-Path $DataDir 'gateway.json'
+        if (Test-Path $configPath) { $Port = (Get-Content $configPath -Raw | ConvertFrom-Json).port }
+        Install-Gateway
+        Install-Ffmpeg
+        Write-Step 'Graphics driver'
+        [void](Test-NvidiaDriver)
+        Write-Host ''
+        Write-Host '    Updated. Your phones stay paired. Check everything with:  .\Setup-DuoPC.ps1 -Check'
+    }
     'Pair' {
         Assert-Admin
         if (-not (Test-Path $GatewayExe)) { throw 'The gateway isn''t installed yet: run this script without -Pair first.' }

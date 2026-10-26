@@ -75,6 +75,7 @@ Pass it to the script with `-PublicHost myhome.duckdns.org`, or type it when ask
 |---|---|
 | `.\Setup-DuoPC.ps1 -Check` | Changes nothing. Checks TightVNC (running, locked to this PC, answering), the gateway (running, TLS 1.3, its certificate), the firewall, and paired phones. |
 | `.\Setup-DuoPC.ps1 -Pair` | Pairs another phone, or pairs again. Shows a new QR code. |
+| `.\Setup-DuoPC.ps1 -Update` | After pulling a new DuoPC version: rebuilds and reinstalls the gateway and video streamer, adds FFmpeg, and checks the NVIDIA driver. Keeps your pairings, port and passwords. |
 | `.\Setup-DuoPC.ps1 -PublicHost NAME` | Uses this address in the QR code instead of asking. |
 | `.\Setup-DuoPC.ps1 -ExternalPort 443` | If your router forwards a different outside port to 5960. |
 | `.\Setup-DuoPC.ps1 -Uninstall` | Removes the gateway (service, files, certificate, pairings), its firewall rule, and TightVNC. |
