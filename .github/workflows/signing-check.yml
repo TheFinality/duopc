@@ -50,7 +50,7 @@ jobs:
 
       - name: Sign and check
         run: |
-          source "$HOME/.cargo/env" 2>/dev/null || true
+          set +e   # run every check and report them all; the exit code is set at the end
           app=build/Build/Products/Release-iphoneos/DuoRemote.app
           rc=0
           for variant in unsigned presigned; do
