@@ -32,7 +32,8 @@ struct DuoRemoteApp: App {
     }
 
     private func applyLaunchArguments() {
-        #if DEBUG
+        // DEMO_LAUNCH is set only by the CI launch smoke test, to open the demo in a Release build.
+        #if DEBUG || DEMO_LAUNCH
         let args = ProcessInfo.processInfo.arguments
         if args.contains("-demoSession") { coordinator.openDemo() }
         if let i = args.firstIndex(of: "-vncSmoke"), i + 1 < args.count {

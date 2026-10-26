@@ -1,0 +1,69 @@
+name: Launch smoke test
+
+# Launches the app in a simulator, opens the demo session (no network), and fails with the crash
+# report if the app doesn't survive. Debug and Release, since a crash can depend on optimisation.
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  demo-session:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select the newest Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)
+          sudo xcode-select -s "$latest/Contents/Developer"
+          xcodebuild -version
+
+      - name: Build for the simulator
+        run: |
+          xcodebuild build -project DuoRemote.xcodeproj -scheme DuoRemote -configuration ${{ matrix.configuration }} \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO \
+            ${{ matrix.configuration == 'Release' && 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEMO_LAUNCH' || '' }}
+
+      - name: Launch and open the demo session
+        run: |
+          sim=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          ids = [d["udid"] for runtime, ds in devices.items() if "iOS" in runtime for d in ds if d["name"].startswith("iPhone")]
+          print(ids[-1])')
+          xcrun simctl boot "$sim"
+          xcrun simctl bootstatus "$sim" -b
+          app=$(ls -d build/Build/Products/${{ matrix.configuration }}-iphonesimulator/DuoRemote.app)
+          bundle=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")
+          xcrun simctl install "$sim" "$app"
+          rm -rf ~/Library/Logs/DiagnosticReports/DuoRemote* 2>/dev/null || true
+          xcrun simctl launch --console-pty "$sim" "$bundle" -demoSession > launch.log 2>&1 &
+          sleep 25
+          xcrun simctl io "$sim" screenshot screen.png || true
+          if xcrun simctl spawn "$sim" launchctl list | grep -q "UIKitApplication:$bundle"; then
+            echo "App is still running after opening the demo session."
+            alive=1
+          else
+            echo "App is NOT running: it crashed or quit."
+            alive=0
+          fi
+          echo "--- console"; tail -n 80 launch.log || true
+          mkdir -p crash
+          cp ~/Library/Logs/DiagnosticReports/DuoRemote* crash/ 2>/dev/null || true
+          for f in crash/*; do [ -f "$f" ] && { echo "--- $f"; head -c 20000 "$f"; }; done
+          test "$alive" = 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-${{ matrix.configuration }}
+          path: |
+            screen.png
+            launch.log
+            crash/
+          if-no-files-found: ignore
