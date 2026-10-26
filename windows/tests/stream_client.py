@@ -33,7 +33,7 @@ def send(kind, payload=b""):
 
 send(0x10, struct.pack("<IH", 8000, 30))           # Start: 8 Mbps, 30 fps
 
-annexb, config, frames, keyframes, sizes, first_frame_at = bytearray(), None, 0, 0, [], None
+annexb, config, frames, keyframes, sizes, first_frame_at, stats = bytearray(), None, 0, 0, [], None, []
 start = time.time()
 sock.settimeout(2)
 try:
@@ -52,6 +52,7 @@ try:
                     annexb += b"\x00\x00\x00\x01" + hvcc[pos + 2:pos + 2 + size]; pos += 2 + size
         elif kind == 0x02:
             flags = payload[0]; sample = payload[9:]
+            send(0x17, payload[1:9])                       # FrameAck: echo the frame's time
             frames += 1; keyframes += flags & 1; sizes.append(len(sample))
             first_frame_at = first_frame_at or time.time() - start
             pos = 0
@@ -60,11 +61,15 @@ try:
                 annexb += b"\x00\x00\x00\x01" + sample[pos + 4:pos + 4 + size]; pos += 4 + size
         elif kind == 0x03:
             print("status:", payload[0], payload[1:].decode(errors="replace"))
+        elif kind == 0x05:
+            fps, skipped, kbps, rtt = struct.unpack_from("<HHIH", payload)
+            stats.append((fps, skipped, kbps, rtt))
 except (socket.timeout, EOFError):
     pass
 sock.close()
 
 print(f"config: {config}")
+print(f"stats (fps, skipped, kbps, best rtt ms): {stats}")
 print(f"frames: {frames} ({keyframes} keyframes) in {seconds:.0f}s, first after {first_frame_at and round(first_frame_at, 2)}s, "
       f"avg {sum(sizes) // max(len(sizes), 1)} bytes, max {max(sizes, default=0)} bytes")
 result = subprocess.run([ffmpeg, "-hide_banner", "-loglevel", "error", "-f", "hevc", "-i", "-", "-f", "null", "-"],

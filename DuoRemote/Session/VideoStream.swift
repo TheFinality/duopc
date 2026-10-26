@@ -42,6 +42,8 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
         case frame(SurfaceBox)
         /// A notice from the PC (e.g. the screen can't be captured right now).
         case notice(String)
+        /// Once a second from the PC: frames sent, frames skipped to keep the delay down, kbps, best round trip.
+        case stats(fps: Int, skipped: Int, kbps: Int, roundTripMs: Int)
         case closed(Failure?)
     }
 
@@ -196,14 +198,18 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
             decoder = HEVCDecoder(width: width, height: height, hvcC: payload.subdata(in: (payload.startIndex + 11)..<payload.endIndex))
             if decoder == nil { onEvent?(.notice("This iPhone couldn't set up a decoder for the PC's video.")) }
         case 0x02 where payload.count > 9:    // Frame: u8 flags, u64 time, sample
-            guard let decoder,
-                  let pixels = decoder.decode(payload.subdata(in: (payload.startIndex + 9)..<payload.endIndex)),
-                  let ref = CVPixelBufferGetIOSurface(pixels)?.takeUnretainedValue() else { return }
+            let pixels = decoder?.decode(payload.subdata(in: (payload.startIndex + 9)..<payload.endIndex))
+            // Acknowledge every frame, decoded or not: the PC paces itself by these (see Pacer.cs).
+            send(0x17, payload.subdata(in: (payload.startIndex + 1)..<(payload.startIndex + 9)))
+            guard let pixels, let ref = CVPixelBufferGetIOSurface(pixels)?.takeUnretainedValue() else { return }
             let surface = unsafeBitCast(ref, to: IOSurface.self)
             let size = CGSize(width: CVPixelBufferGetWidth(pixels), height: CVPixelBufferGetHeight(pixels))
             onEvent?(.frame(SurfaceBox(surface: surface, size: size, owner: pixels)))
         case 0x03 where !payload.isEmpty:     // Status: u8 code, text
             onEvent?(.notice(String(decoding: payload.dropFirst(), as: UTF8.self)))
+        case 0x05 where payload.count >= 10:  // Stats: u16 fps, u16 skipped, u32 kbps, u16 round trip ms
+            onEvent?(.stats(fps: Int(payload.readLE(UInt16.self, at: 0)), skipped: Int(payload.readLE(UInt16.self, at: 2)),
+                            kbps: Int(payload.readLE(UInt32.self, at: 4)), roundTripMs: Int(payload.readLE(UInt16.self, at: 8))))
         default:
             break
         }

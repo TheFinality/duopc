@@ -22,6 +22,7 @@ DuoPC is a fork of [DuoRemote](https://github.com/yezzer/DuoRemote) by Iestyn Ll
 Paired PCs stream the screen as **video** by default: your NVIDIA card encodes it (HEVC) and the iPhone decodes it in hardware, so scrolling and moving windows run at up to 60 fps instead of VNC's catch-up. It goes through the same encrypted, paired connection on port 5960 (no extra ports), and pinch-zoom still gives you full 4K detail.
 
 - **Needs** an NVIDIA graphics card with driver **570 or newer** (update it with the NVIDIA App or from nvidia.com). `Setup-DuoPC.ps1` installs the streamer and FFmpeg; `-Check` tests the encoder.
+- **Keeps the delay down:** the phone acknowledges every frame, and if the network backs up the PC skips frames instead of queueing them; the encoder's rolling refresh repairs the picture within half a second. ••• → Connection log shows fps, Mbps, skipped frames and round trip every few seconds.
 - **Picture quality** sets the bitrate: Fast 8 Mbps (mobile data), Balanced 20 Mbps, Sharp 45 Mbps (home Wi-Fi). Changing it restarts the video for a moment.
 - **Switch to VNC** any time: ••• → Video streaming, or per PC in Edit PC. Windows doesn't let normal screen capture see the lock screen or admin (UAC) prompts; when one is up, the app offers **Use VNC for now**.
 - Not yet in video mode: the PC's clipboard coming to the iPhone, the pointer's shape (you see an arrow), and Ctrl+Alt+Del (Windows ignores it unless it comes through VNC).
@@ -128,6 +129,7 @@ The GitHub Actions workflow (`.github/workflows/build.yml`) builds the app and r
 
 - **Direct, encrypted connections** through DuoPC Gateway, paired by QR code (above). DuoRemote relies on Tailscale.
 - **PC keys.** Sticky `ctrl` `⊞` `alt` `⇧` (tap to latch, double-tap to lock). On a hardware keyboard, ⌘ is the Windows key and ⌥ is Alt, as in Boot Camp.
+- **Autocorrect and suggestions on the keyboard.** Corrections are sent to the PC as Backspaces plus the corrected word; dragging on the space bar moves the PC's cursor. It starts fresh whenever you click or use a key from the bar. Turn it off in Settings (e.g. for passwords).
 - **Windows shortcuts** in the ••• menu: Ctrl+Alt+Del, Task Manager, Start menu, Task view, Show desktop, File Explorer.
 - **Clipboard PC → iPhone.** Copy on the PC (Ctrl+C) and it's on your iPhone for 10 minutes. *Paste to PC* types your iPhone clipboard into the PC. *Copy text from screen* (Live Text) is still there for text you can't select.
 - **Scroll speed retuned for Windows**, which scrolls 3 lines per wheel step.

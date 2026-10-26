@@ -125,11 +125,16 @@ final class VNCSession {
     private(set) var isVideo = false
     /// A notice from the PC about the video (e.g. its screen can't be captured right now).
     private(set) var videoNotice: String?
+    @ObservationIgnored private var videoStatsCount = 0
     @ObservationIgnored private var bridge: ConnectionBridge?
     @ObservationIgnored private var userDisconnecting = false
     @ObservationIgnored private var pendingMove = false
     @ObservationIgnored private var heldModifiers: [VNCKeyCode] = []
     @ObservationIgnored private var heldButton: VNCMouseButton?
+    /// Called when the PC's text cursor may have moved other than by the on-screen keyboard's own
+    /// typing (a click, a key from the bar, a shortcut, a paste): the keyboard forgets what it typed,
+    /// so autocorrect never edits text that isn't where it thinks.
+    @ObservationIgnored var onCaretMoved: (() -> Void)?
     @ObservationIgnored private var log: (@Sendable (String) -> Void)?
 
     init(hostname: String, port: UInt16 = 5900) {
@@ -274,6 +279,12 @@ final class VNCSession {
         case .notice(let text):
             note("video: \(text)")
             videoNotice = text
+        case .stats(let fps, let skipped, let kbps, let roundTripMs):
+            // One line every few seconds is enough to see how the link is doing.
+            videoStatsCount += 1
+            if videoStatsCount % 5 == 1 {
+                note("video: \(fps) fps, \(kbps / 1000) Mbps, \(skipped) skipped, round trip \(roundTripMs) ms")
+            }
         case .closed(let failure):
             video = nil
             if userDisconnecting { status = .disconnected(nil); return }
@@ -407,6 +418,7 @@ final class VNCSession {
 
     /// Presses a mouse button with the latched/locked modifiers held until `buttonUp`.
     func buttonDown(_ button: VNCMouseButton) {
+        onCaretMoved?()
         flushPointer()
         heldModifiers = modifiers.consume()
         heldModifiers.forEach { link?.keyDown($0) }
@@ -450,7 +462,32 @@ final class VNCSession {
 
     /// Down + up, wrapped in the latched/locked modifiers.
     func press(_ key: VNCKeyCode) {
+        onCaretMoved?()
         withModifiers { $0.tap(key) }
+    }
+
+    // MARK: On-screen keyboard (see KeyCaptureView's autocorrect)
+
+    /// Typing from the on-screen keyboard. With a modifier latched it's a shortcut (returns false),
+    /// and the keyboard forgets its context.
+    @discardableResult
+    func keyboardType(_ text: String) -> Bool {
+        let isText = !modifiers.isAnyActive
+        type(text)
+        return isText
+    }
+
+    /// Backspaces, or Left/Right arrows, with no modifiers, for the keyboard's corrections and
+    /// cursor moves.
+    func keyboardTap(_ key: VNCKeyCode, count: Int = 1) {
+        guard let c = link, count > 0 else { return }
+        for _ in 0..<count { c.tap(key) }
+    }
+
+    /// Text for the keyboard's corrections, with no modifiers.
+    func keyboardTypeRaw(_ text: String) {
+        guard let c = link else { return }
+        KeyMapping.keyCodes(for: text).forEach(c.tap)
     }
 
     /// Types text, wrapped in the latched/locked modifiers. \n → Return, \t → Tab.
@@ -462,6 +499,7 @@ final class VNCSession {
 
     /// Holds the shortcut's keys together, then releases them. The sticky modifiers stay as they are.
     func send(_ shortcut: WindowsShortcut) {
+        onCaretMoved?()
         guard let c = link else { return }
         note("shortcut: \(shortcut.title)")
         shortcut.keys.forEach { c.keyDown($0) }
@@ -482,6 +520,7 @@ final class VNCSession {
     /// compose box. Typing rather than ClientCutText, because that is Latin-1 only and would mangle
     /// anything else.
     func pasteToPC(_ text: String) {
+        onCaretMoved?()
         // Never submit: drop trailing line breaks, and type inner ones as Shift-Return (a soft
         // line break in chat and web apps, an ordinary newline in editors).
         let lines = KeyMapping.pasteLines(text)
@@ -500,6 +539,7 @@ final class VNCSession {
 
     /// Types text without applying the sticky modifiers (compose box).
     func typeRaw(_ text: String) {
+        onCaretMoved?()
         guard let c = link else { return }
         KeyMapping.keyCodes(for: text).forEach(c.tap)
     }

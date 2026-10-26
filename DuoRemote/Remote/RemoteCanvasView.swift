@@ -156,7 +156,9 @@ final class RemoteCanvasView: UIView, SessionDisplay {
 
         // 120 Hz while the user is interacting, 60 Hz while the PC's screen or an effect is
         // changing, and 30 Hz when nothing is happening (a touch brings it straight back up).
-        let wanted: Float = now - lastActivity < 1 ? 120 : (now - lastScreenChange < 1 || animating) ? 60 : 30
+        // Video gets 120 Hz while it's moving, so a new frame waits at most one short refresh.
+        let changing: Float = session.isVideo ? 120 : 60
+        let wanted: Float = now - lastActivity < 1 ? 120 : (now - lastScreenChange < 1 || animating) ? changing : 30
         if link.preferredFrameRateRange.preferred != wanted {
             link.preferredFrameRateRange = CAFrameRateRange(minimum: min(30, wanted), maximum: wanted, preferred: wanted)
         }

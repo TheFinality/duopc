@@ -74,4 +74,7 @@ final class ModifierState {
     }
 
     func reset() { mode = [:] }
+
+    /// Some modifier is latched or locked: the next key is a shortcut, not text.
+    var isAnyActive: Bool { mode.values.contains { $0 != .off } }
 }

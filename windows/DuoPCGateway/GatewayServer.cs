@@ -127,6 +127,8 @@ public sealed class GatewayServer
         try
         {
             client.NoDelay = true;
+            // Keep the send buffer small: screen updates waiting in it arrive late.
+            client.SendBufferSize = 256 * 1024;
             using var tls = new SslStream(client.GetStream(), leaveInnerStreamOpen: false);
             using (var handshake = CancellationTokenSource.CreateLinkedTokenSource(cancel))
             {

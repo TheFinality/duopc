@@ -24,6 +24,10 @@ public sealed class VideoEncoder : IDisposable
         return "ffmpeg.exe";   // on PATH (development)
     }
 
+    /// Rolling intra refresh period: a skipped frame's damage is repaired within this many frames,
+    /// and there are no big keyframes after the first one to cause their own delay spikes.
+    public const int RefreshFrames = 30;
+
     public static string[] Arguments(int bitrateKbps, int fps, bool software)
     {
         // No pointer in the video: the app draws its own, which moves the instant the finger does.
@@ -34,10 +38,10 @@ public sealed class VideoEncoder : IDisposable
         string[] codec = software
             ? ["-vf", "hwdownload,format=bgra,scale=1280:-2,format=yuv420p",
                "-c:v", "libx265", "-preset", "ultrafast", "-tune", "zerolatency",
-               "-x265-params", $"keyint={fps * 10}:bframes=0:log-level=error", "-b:v", $"{bitrateKbps}k"]
+               "-x265-params", $"keyint={RefreshFrames}:intra-refresh=1:bframes=0:log-level=error", "-b:v", $"{bitrateKbps}k"]
             : ["-c:v", "hevc_nvenc", "-preset", "p1", "-tune", "ull", "-zerolatency", "1", "-delay", "0",
                "-rc", "cbr", "-b:v", $"{bitrateKbps}k", "-maxrate", $"{bitrateKbps}k", "-bufsize", $"{buffer}k",
-               "-bf", "0", "-g", $"{fps * 10}", "-forced-idr", "1"];
+               "-bf", "0", "-g", $"{RefreshFrames}", "-intra-refresh", "1"];
         string[] output = ["-f", "mp4", "-movflags", "empty_moov+default_base_moof+frag_every_frame",
                            "-flush_packets", "1", "pipe:1"];
         return [.. common, .. codec, .. output];

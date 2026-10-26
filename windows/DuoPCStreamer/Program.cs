@@ -25,7 +25,8 @@ TcpClient client;
 if (Option("--connect") is { } target && Option("--secret") is { } secretHex)
 {
     var parts = target.Split(':');
-    client = new TcpClient { NoDelay = true };
+    // A small send buffer: video waiting in it is video arriving late.
+    client = new TcpClient { NoDelay = true, SendBufferSize = 256 * 1024 };
     await client.ConnectAsync(IPAddress.Parse(parts[0]), int.Parse(parts[1]));
     stream = client.GetStream();
     await stream.WriteAsync(Convert.FromHexString(secretHex));
@@ -37,6 +38,7 @@ else if (int.TryParse(Option("--listen"), out var port))
     log.Info($"listening on 127.0.0.1:{port}");
     client = await listener.AcceptTcpClientAsync();
     client.NoDelay = true;
+    client.SendBufferSize = 256 * 1024;
     listener.Stop();
     stream = client.GetStream();
 }
@@ -49,6 +51,7 @@ else
 using var cancel = new CancellationTokenSource();
 using var input = new InputInjector(log);
 var writeLock = new SemaphoreSlim(1, 1);
+var pacer = new Pacer();
 var bitrateKbps = 20_000;
 var fps = 60;
 VideoEncoder? encoder = null;
@@ -88,11 +91,26 @@ async Task RunEncoderAsync(CancellationToken stop)
                 onFrame: async (sample, keyframe) =>
                 {
                     frames++;
-                    var payload = new byte[9 + sample.Length];
-                    payload[0] = keyframe ? (byte)1 : (byte)0;
-                    BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(1), (ulong)(DateTimeOffset.UtcNow - started).Ticks / 10);
-                    sample.CopyTo(payload.AsSpan(9));
-                    await SendAsync(StreamProtocol.Frame, payload);
+                    var now = Environment.TickCount64;
+                    if (pacer.ShouldSend(keyframe, now))
+                    {
+                        var time = (ulong)(DateTimeOffset.UtcNow - started).Ticks / 10;
+                        var payload = new byte[9 + sample.Length];
+                        payload[0] = keyframe ? (byte)1 : (byte)0;
+                        BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(1), time);
+                        sample.CopyTo(payload.AsSpan(9));
+                        pacer.Sent(time, sample.Length, now);
+                        await SendAsync(StreamProtocol.Frame, payload);
+                    }
+                    if (pacer.Report(now) is { } stats)
+                    {
+                        var report = new byte[10];
+                        BinaryPrimitives.WriteUInt16LittleEndian(report, (ushort)stats.Fps);
+                        BinaryPrimitives.WriteUInt16LittleEndian(report.AsSpan(2), (ushort)Math.Min(stats.Skipped, ushort.MaxValue));
+                        BinaryPrimitives.WriteUInt32LittleEndian(report.AsSpan(4), (uint)stats.Kbps);
+                        BinaryPrimitives.WriteUInt16LittleEndian(report.AsSpan(8), (ushort)Math.Min(stats.RttMs, ushort.MaxValue));
+                        await SendAsync(StreamProtocol.Stats, report);
+                    }
                 },
                 fps, stop);
         }
@@ -153,6 +171,9 @@ try
                 var keysym = BinaryPrimitives.ReadUInt32LittleEndian(p);
                 var keyDown = p[4] != 0;
                 input.Post(() => input.Key(keysym, keyDown));
+                break;
+            case StreamProtocol.FrameAck when p.Length >= 8:
+                pacer.Acked(BinaryPrimitives.ReadUInt64LittleEndian(p), Environment.TickCount64);
                 break;
             case StreamProtocol.Text:
                 var text = Encoding.UTF8.GetString(p);

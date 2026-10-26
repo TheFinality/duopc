@@ -51,4 +51,45 @@ struct KeyMappingTests {
         // Balanced is what the library asked for before this was adjustable.
         #expect(PictureQuality.balanced.jpegQuality == 6 && PictureQuality.balanced.compressionLevel == 5)
     }
+
+    // MARK: Keyboard autocorrect mirror (KeyCaptureView)
+
+    private func keyboard() -> (KeyCaptureView, VNCSession) {
+        let session = VNCSession.demo()
+        let view = KeyCaptureView(frame: .zero)
+        view.session = session
+        session.onCaretMoved = { [weak view] in view?.forgetTyped() }
+        return (view, session)
+    }
+
+    private func everything(_ view: KeyCaptureView) -> String? {
+        view.textRange(from: view.beginningOfDocument, to: view.endOfDocument).flatMap { view.text(in: $0) }
+    }
+
+    @Test func correctionsEditTheTypedText() throws {
+        let (view, _) = keyboard()
+        view.insertText("teh")
+        #expect(everything(view) == "teh")
+        let word = try #require(view.textRange(from: view.beginningOfDocument, to: view.endOfDocument))
+        view.replace(word, withText: "the")                 // what autocorrect does
+        view.insertText(" ")
+        #expect(everything(view) == "the ")
+        view.deleteBackward()
+        #expect(everything(view) == "the")
+        #expect(view.offset(from: view.beginningOfDocument, to: try #require(view.selectedTextRange).end) == 3)
+    }
+
+    @Test func movingTheCursorAndOtherInputForget() throws {
+        let (view, session) = keyboard()
+        view.insertText("hello")
+        let start = try #require(view.position(from: view.beginningOfDocument, offset: 1))
+        view.selectedTextRange = view.textRange(from: start, to: start)   // the space-bar drag
+        view.insertText("X")
+        #expect(everything(view) == "hXello")
+        session.press(.escape)                               // a key from the bar: the PC's cursor may have moved
+        #expect(everything(view) == "")
+        view.insertText("a\n")                               // Return starts a new context too
+        #expect(everything(view) == "")
+    }
 }
+
