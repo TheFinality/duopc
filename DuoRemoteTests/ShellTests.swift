@@ -1,5 +1,6 @@
 import Testing
 import CoreGraphics
+import Foundation
 @testable import DuoRemote
 
 struct ShellTests {
@@ -40,3 +41,31 @@ struct ShellTests {
         #expect(h == CGRect(x: 0, y: 0, width: 400, height: 600))
     }
 }
+
+/// The app's own executable (the tests run inside the app) is signed by the linker, with SHA-256 page hashes.
+struct CodeIntegrityTests {
+    private func ownExecutable() throws -> Data {
+        let url = try #require(Bundle.main.executableURL)
+        return try Data(contentsOf: url)
+    }
+
+    @Test func intactExecutableHasNoDamagedPages() throws {
+        let damaged = try #require(CodeIntegrity.damagedPages(in: ownExecutable()))
+        #expect(damaged.isEmpty)
+    }
+
+    @Test func flippedByteIsFoundOnItsPage() throws {
+        var data = try ownExecutable()
+        let offset = data.count / 2        // well inside the signed code, whatever the build's layout
+        data[offset] ^= 0xFF
+        let damaged = try #require(CodeIntegrity.damagedPages(in: data))
+        #expect(damaged.count == 1)
+        #expect(damaged.first.map { $0 <= offset && offset < $0 + 0x4000 } == true)
+    }
+
+    @Test func notAMachOIsNotChecked() {
+        #expect(CodeIntegrity.damagedPages(in: Data()) == nil)
+        #expect(CodeIntegrity.damagedPages(in: Data(repeating: 0xAB, count: 4096)) == nil)
+    }
+}
+

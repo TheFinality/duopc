@@ -4,6 +4,8 @@ import SwiftUI
 struct RootView: View {
     @State var coordinator: SessionCoordinator
     @Environment(\.scenePhase) private var scenePhase
+    /// Code pages that don't match the app's signature (see `CodeIntegrity`).
+    @State private var damagedPages: [Int] = []
 
     var body: some View {
         ZStack {
@@ -24,5 +26,15 @@ struct RootView: View {
             if phase == .active { SkyTheme.shared.refresh() }
         }
         .onAppear { SkyTheme.shared.start() }
+        .task {
+            let damaged = await Task.detached(priority: .utility) { CodeIntegrity.checkInstalledApp() ?? [] }.value
+            damagedPages = damaged
+        }
+        .alert("This copy of DuoPC is damaged", isPresented: Binding(get: { !damagedPages.isEmpty },
+                                                                   set: { if !$0 { damagedPages = [] } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Part of the app was damaged while it was being installed (\(damagedPages.count) of its code pages, the first at \(String(format: "0x%x", damagedPages.first ?? 0))), so it will crash when it reaches that part. Delete DuoPC and sideload it again.")
+        }
     }
 }
