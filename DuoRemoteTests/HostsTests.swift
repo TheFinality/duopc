@@ -115,8 +115,7 @@ private struct StubProbe: ReachabilityProbe {
         #expect(code.certificateSHA256 == Self.fingerprint)
         #expect(code.token == Self.token)
         #expect(code.vncPassword == "p@ss w0rd")
-        #expect(PairingCode.parse("  " + Self.code() + "
-")?.vncPassword == nil)
+        #expect(PairingCode.parse("  " + Self.code() + "\n")?.vncPassword == nil)
     }
 
     @Test func malformedPairingCodesAreRefused() {
