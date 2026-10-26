@@ -7,17 +7,21 @@ on:
 
 jobs:
   ios:
-    runs-on: macos-latest
+    # The fold API (reservedRegions) is in the iOS 27.1 SDK, so this needs the Xcode 27 image;
+    # macos-latest tops out at Xcode 26.
+    runs-on: xcode-27
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      # The project needs Xcode 27 (iOS 27.1 SDK): use the newest Xcode on the runner.
       - name: Select the newest Xcode
         run: |
+          ls -d /Applications/Xcode*.app
           latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)
           sudo xcode-select -s "$latest/Contents/Developer"
           xcodebuild -version
+          xcodebuild -showsdks | grep -i ios
+          xcrun simctl list runtimes | grep -i ios
 
       - name: Build (simulator, no signing)
         run: |
@@ -37,7 +41,7 @@ jobs:
   windows-script:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Parse Setup-DuoPC.ps1
         shell: powershell
         run: |
