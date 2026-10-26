@@ -7,6 +7,7 @@ struct SettingsView: View {
     @AppStorage("scrollSpeed") private var scrollSpeed = VNCSession.defaultScrollSpeed
     @AppStorage("invertScroll") private var invertScroll = false
     @AppStorage(PictureQuality.storageKey) private var pictureQuality: PictureQuality = .balanced
+    @AppStorage("keyHaptics") private var keyHaptics = true
     @AppStorage("autoCompose") private var autoCompose = true
     @AppStorage("effectsEnabled") private var effectsEnabled = true
     @AppStorage("skyTheme") private var skyTheme = true
@@ -50,10 +51,11 @@ struct SettingsView: View {
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     Toggle("Open the text box when you click into text", isOn: $autoCompose)
+                    Toggle("Haptic feedback when typing", isOn: $keyHaptics)
                 } header: {
                     Text("Controls")
                 } footer: {
-                    Text("Natural scrolling moves content with your finger. Changes apply to the next connection.")
+                    Text("Natural scrolling moves content with your finger. Changes apply to the next connection. Typing haptics are a light tap per key on the keyboard; if you also feel iOS's own keyboard haptics (Settings → Sounds & Haptics → Keyboard Feedback), turn one of them off.")
                 }
 
                 Section {
