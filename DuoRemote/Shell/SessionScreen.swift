@@ -23,6 +23,9 @@ struct SessionScreen: View {
     /// Full window size from a keyboard-independent view (laptop pose is pinned to this).
     @State private var fullSize: CGSize = .zero
     @AppStorage("deckMode") private var deckMode: DeckMode = .trackpad
+    /// The suggestion bar makes the keyboard taller than the deck's half has room for, covering its
+    /// top bar, so laptop pose leaves autocorrect off unless this is on.
+    @AppStorage("laptopAutocorrect") private var laptopAutocorrect = false
 
     #if DEBUG
     private let forceLaptop = ProcessInfo.processInfo.arguments.contains("-laptopDemo")
@@ -126,7 +129,10 @@ struct SessionScreen: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .background { KeyboardInput(session: session, softwareKeyboardShown: $keyboardShown, isSuspended: composeShown) }
+            .background {
+                KeyboardInput(session: session, softwareKeyboardShown: $keyboardShown, isSuspended: composeShown,
+                              allowsSuggestions: laptopFold == nil || laptopAutocorrect)
+            }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { note in
                 let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect) ?? .zero
                 keyboardTop = frame.height > 100 ? frame.minY : nil   // ignore the hardware-keyboard shortcut bar

@@ -9,11 +9,14 @@ struct KeyboardInput: UIViewRepresentable {
 
     /// While true (e.g. the compose box has focus) this view gives up first responder.
     var isSuspended = false
+    /// Autocorrect and the suggestion bar, if Settings allows them (off in laptop pose: no room).
+    var allowsSuggestions = true
 
-    init(session: VNCSession, softwareKeyboardShown: Binding<Bool>, isSuspended: Bool = false) {
+    init(session: VNCSession, softwareKeyboardShown: Binding<Bool>, isSuspended: Bool = false, allowsSuggestions: Bool = true) {
         self.session = session
         self._softwareKeyboardShown = softwareKeyboardShown
         self.isSuspended = isSuspended
+        self.allowsSuggestions = allowsSuggestions
     }
 
     func makeUIView(context: Context) -> KeyCaptureView {
@@ -31,6 +34,7 @@ struct KeyboardInput: UIViewRepresentable {
         view.shownBinding = $softwareKeyboardShown
         view.softwareKeyboardShown = softwareKeyboardShown
         view.isSuspended = isSuspended
+        view.allowsSuggestions = allowsSuggestions
         view.claimFirstResponder()
     }
 }
@@ -68,8 +72,17 @@ final class KeyCaptureView: UIView, UITextInput {
     private var held: [UInt32: VNCKeyCode] = [:]
 
     // MARK: UITextInputTraits
+    /// Off in laptop pose (unless Settings says otherwise); changing it swaps the keyboard in place.
+    var allowsSuggestions = true {
+        didSet {
+            guard allowsSuggestions != oldValue, isFirstResponder else { return }
+            reloadInputViews()
+        }
+    }
     /// Read when the keyboard comes up, so the Settings switch applies from the next time it opens.
-    private var autocorrects: Bool { UserDefaults.standard.object(forKey: "keyboardAutocorrect") as? Bool ?? true }
+    private var autocorrects: Bool {
+        allowsSuggestions && (UserDefaults.standard.object(forKey: "keyboardAutocorrect") as? Bool ?? true)
+    }
     var autocorrectionType: UITextAutocorrectionType {
         get { autocorrects ? .yes : .no }
         set {}
