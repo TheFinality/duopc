@@ -91,11 +91,6 @@ struct HostsTests {
         #expect(model.state(for: up) == .online)
         #expect(model.state(for: down) == .offline)
     }
-}
-
-private struct StubProbe: ReachabilityProbe {
-    let online: Set<String>
-    func isReachable(hostname: String, port: UInt16) async -> Bool { online.contains(hostname) }
 
     // MARK: Pairing codes (as made by windows/DuoPCGateway)
 
@@ -139,4 +134,9 @@ private struct StubProbe: ReachabilityProbe {
         #expect(back.isDirect && back.gatewayPin?.count == 32)
         #expect(PairingCode.shortFingerprint(Self.fingerprint) == "4fd8 3603 5c36 85bb")
     }
+}
+
+private struct StubProbe: ReachabilityProbe {
+    let online: Set<String>
+    func isReachable(hostname: String, port: UInt16) async -> Bool { online.contains(hostname) }
 }
