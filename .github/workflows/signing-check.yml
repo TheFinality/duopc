@@ -1,0 +1,65 @@
+name: Sideload signing check
+
+# Signs the Release app with apple-codesign-quick (the signer iloader uses, via isideload), ad-hoc,
+# and checks every code page with Apple's codesign and with check_code_pages.py. Tries the app
+# unsigned (as DuoPC.ipa ships it) and pre-signed ad-hoc by Apple's codesign.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/signing-check.yml'
+      - '.github/scripts/check_code_pages.py'
+
+jobs:
+  check:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select the newest Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)
+          sudo xcode-select -s "$latest/Contents/Developer"
+
+      - name: Build for iPhone (Release, unsigned), as the ipa job does
+        run: |
+          xcodebuild build -project DuoRemote.xcodeproj -scheme DuoRemote -configuration Release \
+            -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" -quiet
+
+      - name: Build a signer on apple-codesign-quick
+        run: |
+          command -v cargo || { curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal; }
+          source "$HOME/.cargo/env" 2>/dev/null || true
+          cargo new -q quicksign && cd quicksign
+          cargo add -q apple-codesign-quick@0.1 plist@1
+          cat > src/main.rs <<'EOF'
+          use apple_codesign_quick::{sign_bundle, BundleSigningSettings};
+          fn main() {
+              let path = std::env::args().nth(1).expect("bundle path");
+              let settings = BundleSigningSettings::new("ABCDE12345", plist::Dictionary::new(), None);
+              sign_bundle(&path, &settings).expect("signing failed");
+              println!("signed {path}");
+          }
+          EOF
+          cargo build -q --release
+          cargo tree -q -i apple-codesign-quick | head -1
+
+      - name: Sign and check
+        run: |
+          source "$HOME/.cargo/env" 2>/dev/null || true
+          app=build/Build/Products/Release-iphoneos/DuoRemote.app
+          rc=0
+          for variant in unsigned presigned; do
+            echo "::group::$variant"
+            rm -rf "$variant" && mkdir "$variant" && cp -R "$app" "$variant/"
+            target="$variant/DuoRemote.app"
+            if [ "$variant" = presigned ]; then codesign --force --sign - "$target"; fi
+            ./quicksign/target/release/quicksign "$target"
+            codesign -d -vvv "$target" 2>&1 | grep -E "Format|CodeDirectory|Hash type|Executable Segment|Signature|TeamIdentifier" || true
+            if codesign --verify --strict -vvvv "$target"; then echo "codesign verify: OK"; else echo "codesign verify: FAILED"; rc=1; fi
+            python3 .github/scripts/check_code_pages.py "$target/DuoRemote" || rc=1
+            echo "::endgroup::"
+          done
+          exit $rc

@@ -36,6 +36,8 @@ struct DuoRemoteApp: App {
         #if DEBUG || DEMO_LAUNCH
         let args = ProcessInfo.processInfo.arguments
         if args.contains("-demoSession") { coordinator.openDemo() }
+        #endif
+        #if DEBUG
         if let i = args.firstIndex(of: "-vncSmoke"), i + 1 < args.count {
             VNCSmokeTest.run(host: args[i + 1])
         }
