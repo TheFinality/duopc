@@ -1,0 +1,41 @@
+name: Bug report
+description: Something doesn't work as it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Connect to a Mac
+        2. …
+  - type: input
+    id: iphone
+    attributes:
+      label: iPhone model and iOS version
+      placeholder: iPhone Duo, iOS 27.2
+    validations:
+      required: true
+  - type: dropdown
+    id: pose
+    attributes:
+      label: iPhone Duo pose (if relevant)
+      options: [Not a Duo, Folded (outer display), Open (book), Laptop pose]
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: macOS 27.1
+  - type: textarea
+    id: log
+    attributes:
+      label: Connection log
+      description: ••• → Connection log. Check it for anything private before pasting.
+      render: text

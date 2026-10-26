@@ -1,0 +1,6 @@
+// Signing. Set your team and a unique bundle ID in Xcode (Signing & Capabilities), or in
+// Config/Local.xcconfig, which git ignores.
+DEVELOPMENT_TEAM =
+APP_BUNDLE_ID = com.example.duoremote
+
+#include? "Local.xcconfig"
