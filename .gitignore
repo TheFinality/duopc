@@ -35,3 +35,4 @@ Config/Local.xcconfig
 # DuoPC Gateway build output
 windows/DuoPCGateway/bin/
 windows/DuoPCGateway/obj/
+dist/

@@ -38,6 +38,42 @@ jobs:
           xcodebuild test -project DuoRemote.xcodeproj -scheme DuoRemote \
             -destination "platform=iOS Simulator,name=$sim" CODE_SIGNING_ALLOWED=NO
 
+  # An unsigned app for sideloading from Windows (Sideloadly / AltStore sign it with your Apple ID).
+  ipa:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select the newest Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)
+          sudo xcode-select -s "$latest/Contents/Developer"
+          xcodebuild -version
+
+      - name: Build for iPhone (Release, unsigned)
+        run: |
+          xcodebuild build -project DuoRemote.xcodeproj -scheme DuoRemote -configuration Release \
+            -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+
+      - name: Package DuoPC.ipa
+        run: |
+          app=build/Build/Products/Release-iphoneos/DuoRemote.app
+          test -d "$app"
+          mkdir -p ipa/Payload
+          cp -R "$app" ipa/Payload/
+          (cd ipa && zip -qry ../DuoPC.ipa Payload)
+          ls -l DuoPC.ipa
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' -c 'Print :CFBundleIdentifier' -c 'Print :CFBundleShortVersionString' "$app/Info.plist"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DuoPC-ipa
+          path: DuoPC.ipa
+          retention-days: 30
+          if-no-files-found: error
+
   windows:
     runs-on: windows-latest
     steps:

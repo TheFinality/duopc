@@ -81,19 +81,37 @@ The gateway has its own commands too (`C:\Program Files\DuoPC\DuoPCGateway.exe`,
 
 Its log is `C:\ProgramData\DuoPC\gateway.log`: who connected, and rejected attempts.
 
-## Build the app
+## Install the app from Windows (free, no Mac)
 
-Building needs a **Mac with Xcode 27**; you can't build iOS apps on Windows. A free Apple account is enough to run it on your own phone.
+GitHub builds the app for you on a cloud Mac. You sign and install it from Windows with a free Apple ID, using a sideloading tool.
+
+1. **Download `DuoPC.ipa`.** On GitHub, open **Actions** → the latest green **Build and test** run → **Artifacts** → **DuoPC-ipa** (a zip with `DuoPC.ipa` inside; artifacts are kept 30 days, and every push makes a new one). Or, with the GitHub CLI:
+   ```bash
+   gh run download --repo TheFinality/duopc --name DuoPC-ipa --dir D:\duocomputer\dist
+   ```
+2. **Install [Sideloadly](https://sideloadly.io)** on the PC and follow its setup notes. It may need Apple's iTunes and iCloud for Windows; get the versions it says, since some Microsoft Store versions don't work. (AltServer/AltStore works too and can re-sign over Wi-Fi.)
+3. **Get the iPhone ready.** Plug it into the PC with a cable and tap **Trust** on the phone. Turn on **Settings → Privacy & Security → Developer Mode** (the phone restarts).
+4. **Sideload.** Drag `DuoPC.ipa` into Sideloadly, enter your Apple ID, and press **Start**. Use a spare Apple ID if you'd rather not give a third-party tool your main one: any free Apple ID works.
+5. **Trust it on the phone:** **Settings → General → VPN & Device Management** → your Apple ID → **Trust**. Then open DuoPC and scan your PC's pairing code.
+
+What a free Apple ID means:
+- **The app stops opening after 7 days.** Sideload it again before then (Sideloadly can refresh it automatically while the PC is on). Re-signing with the same Apple ID keeps your paired PCs; a different Apple ID or bundle ID starts fresh, so pair again.
+- At most 3 sideloaded apps at a time, and 10 new app IDs a week.
+- The bundle ID is `io.github.thefinality.duopc` (in `Config/DuoRemote.xcconfig`). If Sideloadly says it's unavailable, change it there and push, or let Sideloadly change it under its advanced options.
+
+## Build the app with Xcode
+
+If you have a Mac (or rent one), you can build and run it directly instead. That needs **Xcode 27**. A free Apple account is enough to run it on your own phone, with the same 7-day limit.
 
 1. Clone this repo on the Mac and open `DuoRemote.xcodeproj`. (The project and target keep the DuoRemote name; the app shows up as **DuoPC**.)
-2. Select the **DuoRemote** target → **Signing & Capabilities**, choose your **Team**, and change the **Bundle Identifier** to your own (e.g. `com.yourname.duopc`). Or put both in `Config/Local.xcconfig` (git ignores it):
+2. Select the **DuoRemote** target → **Signing & Capabilities**, choose your **Team**, and if Xcode says the **Bundle Identifier** is taken, change it to your own (e.g. `com.yourname.duopc`). Or put both in `Config/Local.xcconfig` (git ignores it):
    ```
    DEVELOPMENT_TEAM = YOURTEAMID
    APP_BUNDLE_ID = com.yourname.duopc
    ```
 3. Plug in the iPhone, choose it as the run destination, and press **Run** (⌘R). The first time, trust the developer on the phone: **Settings → General → VPN & Device Management**.
 
-The GitHub Actions workflow (`.github/workflows/build.yml`) builds the app and runs its tests on GitHub's Xcode 27 image, and builds and tests the gateway end to end on Windows.
+The GitHub Actions workflow (`.github/workflows/build.yml`) builds the app and runs its tests on GitHub's Xcode 27 image, builds the unsigned `DuoPC.ipa` for sideloading, and builds and tests the gateway end to end on Windows.
 
 ## What's different from DuoRemote
 
