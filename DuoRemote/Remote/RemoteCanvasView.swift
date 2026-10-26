@@ -181,6 +181,11 @@ final class RemoteCanvasView: UIView, SessionDisplay {
         needsRender = true
     }
 
+    func frameDidArrive() {
+        renderer?.setSurface(session.surface)
+        needsRender = true
+    }
+
     // MARK: Effects
 
     // The Effects setting, Reduce Motion and Low Power Mode, as the rest of the app sees them.

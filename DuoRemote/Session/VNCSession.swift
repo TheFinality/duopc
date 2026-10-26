@@ -40,7 +40,10 @@ enum PictureQuality: String, CaseIterable, Identifiable {
 /// What the canvas view implements so the session can poke it (imperative, high frequency —
 /// deliberately not observation).
 protocol SessionDisplay: AnyObject {
+    /// A new framebuffer (connected, resized): plays the materialise effect.
     func framebufferDidChange()
+    /// The next video frame, in a different surface: just show it.
+    func frameDidArrive()
     func cursorDidChange()
     func viewportDidChange()
 }
@@ -267,7 +270,7 @@ final class VNCSession {
             if status != .connected { status = .connected }
             if videoNotice != nil { videoNotice = nil }
             frameDirty.set()
-            display?.framebufferDidChange()
+            if sizeChanged { display?.framebufferDidChange() } else { display?.frameDidArrive() }
         case .notice(let text):
             note("video: \(text)")
             videoNotice = text
