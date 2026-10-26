@@ -87,7 +87,7 @@ GitHub builds the app for you on a cloud Mac. You sign and install it from Windo
 
 1. **Download `DuoPC.ipa`.** On GitHub, open **Actions** → the latest green **Build and test** run → **Artifacts** → **DuoPC-ipa** (a zip with `DuoPC.ipa` inside; artifacts are kept 30 days, and every push makes a new one). Or, with the GitHub CLI:
    ```bash
-   gh run download --repo TheFinality/duopc --name DuoPC-ipa --dir D:\duocomputer\dist
+   gh run download --repo TheFinality/duopc --name DuoPC-ipa --dir D:/duocomputer/dist
    ```
 2. **Install [Sideloadly](https://sideloadly.io)** on the PC and follow its setup notes. It may need Apple's iTunes and iCloud for Windows; get the versions it says, since some Microsoft Store versions don't work. (AltServer/AltStore works too and can re-sign over Wi-Fi.)
 3. **Get the iPhone ready.** Plug it into the PC with a cable and tap **Trust** on the phone. Turn on **Settings → Privacy & Security → Developer Mode** (the phone restarts).
