@@ -30,6 +30,11 @@ enum PictureQuality: String, CaseIterable, Identifiable {
     var compressionLevel: Int {
         switch self { case .fast: 6; case .balanced: 5; case .sharp: 3 }
     }
+
+    /// Video streaming bitrate (kbps). The PC's screen is 4K-class, so sharp text wants plenty.
+    var videoBitrateKbps: Int {
+        switch self { case .fast: 8_000; case .balanced: 20_000; case .sharp: 45_000 }
+    }
 }
 
 /// What the canvas view implements so the session can poke it (imperative, high frequency —
@@ -109,6 +114,14 @@ final class VNCSession {
     @ObservationIgnored private(set) var isButtonHeld = false
 
     @ObservationIgnored private var connection: VNCConnection?
+    /// The video stream, when this session uses it instead of VNC.
+    @ObservationIgnored private var video: VideoStream?
+    /// Where input goes: the video stream or VNC.
+    private var link: (any RemoteLink)? { video ?? connection }
+    /// Connected over video streaming rather than VNC.
+    private(set) var isVideo = false
+    /// A notice from the PC about the video (e.g. its screen can't be captured right now).
+    private(set) var videoNotice: String?
     @ObservationIgnored private var bridge: ConnectionBridge?
     @ObservationIgnored private var userDisconnecting = false
     @ObservationIgnored private var pendingMove = false
@@ -198,7 +211,79 @@ final class VNCSession {
         userDisconnecting = true
         releaseHeldInput()
         connection?.disconnect()
-        if connection == nil { status = .disconnected(nil) }
+        video?.close()
+        if connection == nil && video == nil { status = .disconnected(nil) }
+    }
+
+    /// Drops the current connection at once, so the next connect can use another channel.
+    func prepareToReconnect() {
+        guard !isDemo else { return }
+        tearDown()
+        status = .idle
+    }
+
+    // MARK: Video streaming
+
+    /// Connects over DuoPC's video channel (HEVC from the PC's GPU) instead of VNC.
+    func connectVideo(gateway: VNCGatewaySettings, address: String? = nil) {
+        guard !isDemo else { return }
+        tearDown()
+        let stream = VideoStream(host: address ?? hostname, port: port, gateway: gateway,
+                                 bitrateKbps: PictureQuality.current.videoBitrateKbps, fps: 60)
+        stream.onEvent = { [weak self, weak stream] event in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let self, let stream else { return }
+                    self.videoEvent(event, from: stream)
+                }
+            }
+        }
+        video = stream
+        isVideo = true
+        videoNotice = nil
+        cursor = nil
+        cursorIsTextBeam = false
+        userDisconnecting = false
+        status = .connecting
+        note("video: connecting")
+        stream.start()
+    }
+
+    private func videoEvent(_ event: VideoStream.Event, from stream: VideoStream) {
+        guard stream === video else { return }
+        switch event {
+        case .frame(let box):
+            let sizeChanged = framebufferSize != box.size
+            surface = box
+            if sizeChanged {
+                let first = framebufferSize == nil
+                framebufferSize = box.size
+                viewport.setContentSize(box.size)
+                if first || pointer.x >= box.size.width || pointer.y >= box.size.height {
+                    pointer = CGPoint(x: box.size.width / 2, y: box.size.height / 2)
+                }
+                note("video: \(Int(box.size.width))×\(Int(box.size.height))")
+            }
+            if status != .connected { status = .connected }
+            if videoNotice != nil { videoNotice = nil }
+            frameDirty.set()
+            display?.framebufferDidChange()
+        case .notice(let text):
+            note("video: \(text)")
+            videoNotice = text
+        case .closed(let failure):
+            video = nil
+            if userDisconnecting { status = .disconnected(nil); return }
+            note("video: closed \(failure.map { "\($0)" } ?? "")")
+            switch failure {
+            case nil: status = .disconnected(nil)
+            case .rejected?: status = .disconnected(.gatewayRejected)
+            case .certificateMismatch?: status = .disconnected(.gatewayCertificateMismatch)
+            case .unavailable?: status = .disconnected(.network("Video streaming isn't set up on this PC yet. Run Setup-DuoPC.ps1 on the PC again, or turn off Video streaming for this PC."))
+            case .closed?: status = .disconnected(.closedByServer)
+            case .network(let message)?: status = .disconnected(.network(message))
+            }
+        }
     }
 
     /// Shows `failure` without connecting (e.g. the password would leave Tailscale).
@@ -213,6 +298,11 @@ final class VNCSession {
         connection?.disconnect()
         connection = nil
         bridge = nil
+        video?.onEvent = nil
+        video?.close()
+        video = nil
+        isVideo = false
+        videoNotice = nil
         heldModifiers = []
         heldButton = nil
         isButtonHeld = false
@@ -280,7 +370,7 @@ final class VNCSession {
         guard pendingMove else { return }
         pendingMove = false
         let (x, y) = wirePointer
-        connection?.mouseMove(x: x, y: y)
+        link?.mouseMove(x: x, y: y)
     }
 
     func click(_ button: VNCMouseButton) {
@@ -316,9 +406,9 @@ final class VNCSession {
     func buttonDown(_ button: VNCMouseButton) {
         flushPointer()
         heldModifiers = modifiers.consume()
-        heldModifiers.forEach { connection?.keyDown($0) }
+        heldModifiers.forEach { link?.keyDown($0) }
         let (x, y) = wirePointer
-        connection?.mouseButtonDown(button, x: x, y: y)
+        link?.mouseButtonDown(button, x: x, y: y)
         heldButton = button
         isButtonHeld = true
         clickObserver?(pointer)
@@ -327,10 +417,10 @@ final class VNCSession {
     func buttonUp(_ button: VNCMouseButton) {
         flushPointer()
         let (x, y) = wirePointer
-        connection?.mouseButtonUp(button, x: x, y: y)
+        link?.mouseButtonUp(button, x: x, y: y)
         heldButton = nil
         isButtonHeld = false
-        heldModifiers.reversed().forEach { connection?.keyUp($0) }
+        heldModifiers.reversed().forEach { link?.keyUp($0) }
         heldModifiers = []
     }
 
@@ -338,7 +428,7 @@ final class VNCSession {
         guard steps > 0 else { return }
         flushPointer()
         let (x, y) = wirePointer
-        connection?.mouseWheel(wheel, x: x, y: y, steps: steps)
+        link?.mouseWheel(wheel, x: x, y: y, steps: steps)
     }
 
     private var wirePointer: (UInt16, UInt16) {
@@ -352,8 +442,8 @@ final class VNCSession {
     // MARK: Keyboard
 
     /// Raw key events (hardware keyboard). No sticky modifiers applied.
-    func keyDown(_ key: VNCKeyCode) { connection?.keyDown(key) }
-    func keyUp(_ key: VNCKeyCode) { connection?.keyUp(key) }
+    func keyDown(_ key: VNCKeyCode) { link?.keyDown(key) }
+    func keyUp(_ key: VNCKeyCode) { link?.keyUp(key) }
 
     /// Down + up, wrapped in the latched/locked modifiers.
     func press(_ key: VNCKeyCode) {
@@ -369,15 +459,15 @@ final class VNCSession {
 
     /// Holds the shortcut's keys together, then releases them. The sticky modifiers stay as they are.
     func send(_ shortcut: WindowsShortcut) {
-        guard let c = connection else { return }
+        guard let c = link else { return }
         note("shortcut: \(shortcut.title)")
         shortcut.keys.forEach { c.keyDown($0) }
         shortcut.keys.reversed().forEach { c.keyUp($0) }
     }
 
-    private func withModifiers(_ body: (VNCConnection) -> Void) {
+    private func withModifiers(_ body: (any RemoteLink) -> Void) {
         let mods = modifiers.consume()
-        guard let c = connection else { return }
+        guard let c = link else { return }
         mods.forEach { c.keyDown($0) }
         body(c)
         mods.reversed().forEach { c.keyUp($0) }
@@ -392,8 +482,8 @@ final class VNCSession {
         // Never submit: drop trailing line breaks, and type inner ones as Shift-Return (a soft
         // line break in chat and web apps, an ordinary newline in editors).
         let lines = KeyMapping.pasteLines(text)
-        guard !lines.isEmpty, let c = connection else {
-            note("paste to PC: nothing sent\(connection == nil ? " — not connected" : "")")
+        guard !lines.isEmpty, let c = link else {
+            note("paste to PC: nothing sent\(link == nil ? " — not connected" : "")")
             return
         }
         note("paste to PC: typing \(lines.reduce(0) { $0 + $1.count }) chars")
@@ -407,7 +497,7 @@ final class VNCSession {
 
     /// Types text without applying the sticky modifiers (compose box).
     func typeRaw(_ text: String) {
-        guard let c = connection else { return }
+        guard let c = link else { return }
         KeyMapping.keyCodes(for: text).forEach(c.tap)
     }
 
@@ -444,6 +534,7 @@ final class VNCSession {
     func applyPictureQuality(_ quality: PictureQuality) {
         UserDefaults.standard.set(quality.rawValue, forKey: PictureQuality.storageKey)
         connection?.updateQuality(jpegQuality: quality.jpegQuality, compressionLevel: quality.compressionLevel)
+        video?.setBitrate(kbps: quality.videoBitrateKbps)
         note("picture quality: \(quality.rawValue)")
     }
 
@@ -468,9 +559,3 @@ extension UIPasteboard {
     }
 }
 
-private extension VNCConnection {
-    func tap(_ key: VNCKeyCode) {
-        keyDown(key)
-        keyUp(key)
-    }
-}

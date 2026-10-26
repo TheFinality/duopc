@@ -20,8 +20,12 @@ struct Host: Identifiable, Codable, Hashable {
     /// gateway: TLS 1.3 pinned to this certificate, from any network. nil = plain VNC, which sends
     /// the password only over Tailscale. The pairing token is in the Keychain.
     var gatewayCertificateSHA256: String?
+    /// For a paired PC: stream the screen as video (DuoPC Streamer, hardware HEVC) instead of VNC.
+    /// nil = the default, on.
+    var videoStreaming: Bool?
 
     var isDirect: Bool { gatewayCertificateSHA256 != nil }
+    var usesVideo: Bool { isDirect && (videoStreaming ?? true) }
     var gatewayPin: Data? { gatewayCertificateSHA256.flatMap(PairingCode.hexData) }
 
     init(id: UUID = UUID(), name: String, hostname: String, port: UInt16 = 5900, username: String,
@@ -47,6 +51,7 @@ struct Host: Identifiable, Codable, Hashable {
         scrollSpeed = try c.decodeIfPresent(Double.self, forKey: .scrollSpeed)
         allowOutsideTailscale = try c.decodeIfPresent(Bool.self, forKey: .allowOutsideTailscale) ?? false
         gatewayCertificateSHA256 = try c.decodeIfPresent(String.self, forKey: .gatewayCertificateSHA256)
+        videoStreaming = try c.decodeIfPresent(Bool.self, forKey: .videoStreaming)
     }
 
     var symbolName: String { symbol ?? HostSymbol.defaultName }

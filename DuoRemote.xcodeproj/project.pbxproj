@@ -28,6 +28,7 @@
 		461B07A27109A5455D89FB5B /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AC2E7AA7B2ACF42FC4A0B1C /* App.swift */; };
 		47E9E2F1DF9B6ECDFBC8DA91 /* HostsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72DA3C8B8592C1EBF009816D /* HostsListView.swift */; };
 		48036388522C75EE9840E66E /* ConnectionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18655A2EA534C0ED347AB130 /* ConnectionBridge.swift */; };
+		08A695F1C519708666AF9C19 /* VideoStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C2AB10A6FCC04A64108E1D2 /* VideoStream.swift */; };
 		49BFACD25E04AEBD8CE908C9 /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFFF502B3CD6E4783786B563 /* Diagnostics.swift */; };
 		50B7CF9EC13C9FB3925DCF2C /* Reachability.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E77504C5DEA3CC6DAAA0F9 /* Reachability.swift */; };
 		5C396D73145823DDEE56EF93 /* ViewportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FC2ED9F0E122D5E9E6DD7AB /* ViewportTests.swift */; };
@@ -87,6 +88,7 @@
 		12DC04B0FADA13286AB95813 /* LiveTextSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTextSheet.swift; sourceTree = "<group>"; };
 		16B9034ED56C3309C6BB3889 /* PointerInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointerInput.swift; sourceTree = "<group>"; };
 		18655A2EA534C0ED347AB130 /* ConnectionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionBridge.swift; sourceTree = "<group>"; };
+		7C2AB10A6FCC04A64108E1D2 /* VideoStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoStream.swift; sourceTree = "<group>"; };
 		18690F33A407B585EE852C88 /* DuoRemoteTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = DuoRemoteTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1AC2E7AA7B2ACF42FC4A0B1C /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		1AE332FC99693282F9A5F246 /* PasteBeam.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteBeam.swift; sourceTree = "<group>"; };
@@ -260,6 +262,7 @@
 			isa = PBXGroup;
 			children = (
 				18655A2EA534C0ED347AB130 /* ConnectionBridge.swift */,
+				7C2AB10A6FCC04A64108E1D2 /* VideoStream.swift */,
 				48CCB6E3896D50119720786E /* CredentialPolicy.swift */,
 				BFFF502B3CD6E4783786B563 /* Diagnostics.swift */,
 				0605BB70B86B445EAB32428C /* KeyMapping.swift */,
@@ -438,6 +441,7 @@
 				D5212FB83ED304D6C535E9D2 /* AppInfo.swift in Sources */,
 				864CA9A69362985126D8F856 /* ComposeBox.swift in Sources */,
 				48036388522C75EE9840E66E /* ConnectionBridge.swift in Sources */,
+				08A695F1C519708666AF9C19 /* VideoStream.swift in Sources */,
 				943F2130CE2519EE33BF2FC1 /* CredentialPolicy.swift in Sources */,
 				B1B95AE30D9DDBFF6E156E4A /* CredentialSheet.swift in Sources */,
 				1113A1B739C44C17220F005A /* DeckEffects.swift in Sources */,

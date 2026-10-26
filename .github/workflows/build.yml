@@ -87,6 +87,8 @@ jobs:
       - name: Build and test DuoPC Gateway end to end
         shell: powershell
         run: ./windows/tests/run-gateway-test.ps1
+      - name: Build DuoPC Streamer
+        run: dotnet build windows/DuoPCStreamer/DuoPCStreamer.csproj -c Release --nologo
       - name: Parse Setup-DuoPC.ps1
         shell: powershell
         run: |

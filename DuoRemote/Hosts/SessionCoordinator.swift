@@ -156,6 +156,12 @@ final class SessionCoordinator {
             begin(host, credentials: given ?? Credentials(username: "", password: ""), address: nil, blocked: .gatewayRejected)
             return
         }
+        let gateway = VNCGatewaySettings(certificateSHA256: pin, token: token)
+        // Video needs no VNC password: the pairing token is the sign-in.
+        if host.usesVideo {
+            begin(host, credentials: given ?? Credentials(username: "", password: ""), address: nil, gateway: gateway, video: true)
+            return
+        }
         var resolved = given
         if resolved == nil, let saved = (try? await keychain.password(forHostID: host.id)) ?? nil, !saved.isEmpty {
             resolved = Credentials(username: host.username, password: saved)
@@ -165,7 +171,18 @@ final class SessionCoordinator {
             prompt(host, outsideAddress: nil)
             return
         }
-        begin(host, credentials: resolved, address: nil, gateway: VNCGatewaySettings(certificateSHA256: pin, token: token))
+        begin(host, credentials: resolved, address: nil, gateway: gateway)
+    }
+
+    /// Turns video streaming on or off for the active PC, remembers it, and reconnects that way.
+    func setVideoStreaming(_ on: Bool) {
+        guard var host = activeHost.flatMap({ store.host(withID: $0.id) }), host.isDirect else { return }
+        host.videoStreaming = on
+        store.update(host)
+        activeHost = host
+        retryAttempt = 0
+        active?.prepareToReconnect()
+        startConnect(host, given: credentials)
     }
 
     private func prompt(_ host: Host, outsideAddress: String?) {
@@ -177,8 +194,9 @@ final class SessionCoordinator {
     ///   - address: the checked address to connect to (nil = let the library resolve the name).
     ///   - blocked: show this failure instead of connecting.
     ///   - gateway: connect through the paired DuoPC Gateway.
+    ///   - video: use its video channel instead of VNC.
     private func begin(_ host: Host, credentials: Credentials, address: String?, blocked: VNCSession.Failure? = nil,
-                       gateway: VNCGatewaySettings? = nil) {
+                       gateway: VNCGatewaySettings? = nil, video: Bool = false) {
         if let current = active, activeHost?.id != host.id { current.disconnect() }
 
         let session: VNCSession
@@ -202,8 +220,12 @@ final class SessionCoordinator {
             switch session.status {
             case .connecting, .connected: break
             default:
-                session.connect(username: credentials.username, password: credentials.password,
-                                address: address, allowOtherAuth: host.allowOutsideTailscale, gateway: gateway)
+                if video, let gateway {
+                    session.connectVideo(gateway: gateway, address: address)
+                } else {
+                    session.connect(username: credentials.username, password: credentials.password,
+                                    address: address, allowOtherAuth: host.allowOutsideTailscale, gateway: gateway)
+                }
             }
         }
         updateIdleTimer()

@@ -17,6 +17,15 @@ It connects **directly** to your PC, at home or away, over an encrypted connecti
 
 DuoPC is a fork of [DuoRemote](https://github.com/yezzer/DuoRemote) by Iestyn Lloyd-Wilkins, which does the same for a Mac.
 
+## Video streaming
+
+Paired PCs stream the screen as **video** by default: your NVIDIA card encodes it (HEVC) and the iPhone decodes it in hardware, so scrolling and moving windows run at up to 60 fps instead of VNC's catch-up. It goes through the same encrypted, paired connection on port 5960 (no extra ports), and pinch-zoom still gives you full 4K detail.
+
+- **Needs** an NVIDIA graphics card with driver **570 or newer** (update it with the NVIDIA App or from nvidia.com). `Setup-DuoPC.ps1` installs the streamer and FFmpeg; `-Check` tests the encoder.
+- **Picture quality** sets the bitrate: Fast 8 Mbps (mobile data), Balanced 20 Mbps, Sharp 45 Mbps (home Wi-Fi). Changing it restarts the video for a moment.
+- **Switch to VNC** any time: ••• → Video streaming, or per PC in Edit PC. Windows doesn't let normal screen capture see the lock screen or admin (UAC) prompts; when one is up, the app offers **Use VNC for now**.
+- Not yet in video mode: the PC's clipboard coming to the iPhone, the pointer's shape (you see an arrow), and Ctrl+Alt+Del (Windows ignores it unless it comes through VNC).
+
 ## Set up your PC (once)
 
 You need Windows 10 or 11, the [.NET 8 SDK](https://dotnet.microsoft.com/download) (to build the gateway), and this repository on the PC.

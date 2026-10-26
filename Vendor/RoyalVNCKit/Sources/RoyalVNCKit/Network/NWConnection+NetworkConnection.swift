@@ -5,10 +5,8 @@ import FoundationEssentials
 import Foundation
 #endif
 
-import CryptoKit
 import Dispatch
 import Network
-import Security
 
 extension NWConnection: NetworkConnection {
     convenience init(settings: NetworkConnectionSettings) {
@@ -19,8 +17,10 @@ extension NWConnection: NetworkConnection {
         tcpOptions.noDelay = true
 
         // LOCAL PATCH: DuoPC Gateway connections are TLS 1.3, pinned to the paired certificate.
-        let tlsOptions = settings.gateway.map { NWConnection.gatewayTLSOptions(pinning: $0.certificateSHA256,
-                                                                               check: settings.gatewayPinCheck) }
+        let pinCheck = settings.gatewayPinCheck
+        let tlsOptions = settings.gateway.map {
+            VNCGatewaySettings.tlsOptions(pinning: $0.certificateSHA256, onMismatch: { pinCheck?.recordMismatch() })
+        }
         let connectionParameters = NWParameters(tls: tlsOptions,
                                                 tcp: tcpOptions)
 
@@ -30,22 +30,6 @@ extension NWConnection: NetworkConnection {
         self.init(host: .init(settings.host),
                   port: .init(rawValue: settings.port)!,
                   using: connectionParameters)
-    }
-
-    /// Trusts exactly one certificate: the one whose DER bytes hash to `pin`. No certificate
-    /// authority, name or expiry check applies; the pin is the whole check.
-    static func gatewayTLSOptions(pinning pin: Data, check: VNCGatewayPinCheck?) -> NWProtocolTLS.Options {
-        let options = NWProtocolTLS.Options()
-        let security = options.securityProtocolOptions
-        sec_protocol_options_set_min_tls_protocol_version(security, .TLSv13)
-        sec_protocol_options_set_verify_block(security, { _, trust, complete in
-            let secTrust = sec_trust_copy_ref(trust).takeRetainedValue()
-            let leaf = (SecTrustCopyCertificateChain(secTrust) as? [SecCertificate])?.first
-            let matches = leaf.map { Data(SHA256.hash(data: SecCertificateCopyData($0) as Data)) == pin } ?? false
-            if !matches { check?.recordMismatch() }
-            complete(matches)
-        }, DispatchQueue.global(qos: .userInitiated))
-        return options
     }
 
     var status: NetworkConnectionStatus {

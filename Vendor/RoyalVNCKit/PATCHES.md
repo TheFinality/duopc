@@ -38,3 +38,5 @@ Only `Sources/{RoyalVNCKit,RoyalVNCKitC,Z,d3des}` and `LICENSE` were copied. Eve
    `VNCConnection.frameDelegate` gets `connectionDidFinishFramebufferUpdate(_:)` once every rectangle of a FramebufferUpdate is
    decoded and reported, before the next one is read, so the client can present complete frames instead of drawing the
    framebuffer while it's being written.
+11. `VNCGatewaySettings.tlsOptions(pinning:onMismatch:)` (`SDK/VNCGateway.swift`) is the public home of patch 8's pinned TLS 1.3
+   options, used by the VNC connection and by DuoPC's video stream, so there's one implementation of the certificate check.

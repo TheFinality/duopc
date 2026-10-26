@@ -12,6 +12,12 @@ import FoundationEssentials
 import Foundation
 #endif
 
+#if canImport(Network)
+import CryptoKit
+import Network
+import Security
+#endif
+
 public struct VNCGatewaySettings: Sendable, Equatable {
 	/// SHA-256 of the gateway certificate's DER bytes.
 	public let certificateSHA256: Data
@@ -44,3 +50,24 @@ final class VNCGatewayPinCheck: @unchecked Sendable {
 		return mismatched
 	}
 }
+
+#if canImport(Network)
+public extension VNCGatewaySettings {
+	/// TLS 1.3 that trusts exactly one certificate: the one whose DER bytes hash to `pin`. No certificate
+	/// authority, name or expiry check applies; the pin is the whole check. Shared by the VNC connection
+	/// and DuoPC's video stream.
+	static func tlsOptions(pinning pin: Data, onMismatch: (@Sendable () -> Void)? = nil) -> NWProtocolTLS.Options {
+		let options = NWProtocolTLS.Options()
+		let security = options.securityProtocolOptions
+		sec_protocol_options_set_min_tls_protocol_version(security, .TLSv13)
+		sec_protocol_options_set_verify_block(security, { _, trust, complete in
+			let secTrust = sec_trust_copy_ref(trust).takeRetainedValue()
+			let leaf = (SecTrustCopyCertificateChain(secTrust) as? [SecCertificate])?.first
+			let matches = leaf.map { Data(SHA256.hash(data: SecCertificateCopyData($0) as Data)) == pin } ?? false
+			if !matches { onMismatch?() }
+			complete(matches)
+		}, DispatchQueue.global(qos: .userInitiated))
+		return options
+	}
+}
+#endif

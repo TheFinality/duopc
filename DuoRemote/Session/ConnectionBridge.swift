@@ -9,6 +9,9 @@ import os
 nonisolated struct SurfaceBox: @unchecked Sendable {
     let surface: IOSurface
     let size: CGSize
+    /// Keeps the surface's owner alive (a decoded video frame's pixel buffer, which VideoToolbox
+    /// would otherwise reuse while it's still on screen).
+    var owner: AnyObject? = nil
 }
 
 /// Set from the library's threads on every framebuffer rect, read + cleared by the display link.

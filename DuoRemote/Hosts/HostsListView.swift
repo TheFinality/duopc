@@ -548,6 +548,7 @@ struct HostEditor: View {
     @State private var newToken: Data?
     @State private var showScanner = false
     @State private var pairingError: String?
+    @State private var videoStreaming: Bool
 
     init(host: Host?, store: HostStore) {
         self.host = host
@@ -562,6 +563,7 @@ struct HostEditor: View {
         _passwordLoaded = State(initialValue: host == nil)
         _allowOutside = State(initialValue: host?.allowOutsideTailscale ?? false)
         _pairedFingerprint = State(initialValue: host?.gatewayCertificateSHA256)
+        _videoStreaming = State(initialValue: host?.videoStreaming ?? true)
     }
 
     private var port: UInt16? {
@@ -669,6 +671,9 @@ struct HostEditor: View {
                 Task { @MainActor in applyPairing(text) }
             }
             if pairedFingerprint != nil {
+                Toggle(isOn: $videoStreaming) {
+                    Label("Video streaming", systemImage: "play.rectangle")
+                }
                 Button("Unpair", systemImage: "lock.open", role: .destructive) {
                     pairedFingerprint = nil
                     newToken = nil
@@ -680,7 +685,7 @@ struct HostEditor: View {
         } footer: {
             Text(pairedFingerprint == nil
                  ? "Setup-DuoPC.ps1 shows a QR code on your PC. Scan it (or copy the code and Paste) to connect directly and encrypted, at home or away, without Tailscale."
-                 : "Connects only to the PC with this certificate, encrypted with TLS 1.3, from any network.")
+                 : "Connects only to the PC with this certificate, encrypted with TLS 1.3, from any network. Video streaming sends the screen as video from the PC's graphics card: much smoother; switch it off to use VNC (also in ••• while connected).")
         }
     }
 
@@ -723,6 +728,7 @@ struct HostEditor: View {
         result.symbol = symbol
         result.allowOutsideTailscale = allowOutside
         result.gatewayCertificateSHA256 = pairedFingerprint
+        result.videoStreaming = pairedFingerprint == nil ? nil : videoStreaming
 
         if host == nil { store.add(result) } else { store.update(result) }
 

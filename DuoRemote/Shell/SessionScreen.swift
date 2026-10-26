@@ -371,6 +371,16 @@ private struct FloatingChrome: View {
             connecting
         case _ where lookingUp:
             connecting
+        case .connected where session.isVideo && session.videoNotice != nil:
+            // The PC can't capture its screen right now (lock screen, admin prompt): VNC can.
+            VStack(spacing: 12) {
+                Text(session.videoNotice ?? "").multilineTextAlignment(.center)
+                Button("Use VNC for now") { coordinator.setVideoStreaming(false) }
+                    .buttonStyle(.glassProminent)
+            }
+            .padding(18)
+            .frame(maxWidth: 320)
+            .glassEffect(.regular, in: .rect(cornerRadius: 24))
         case .disconnected(let failure?):
             VStack(spacing: 12) {
                 Text("Disconnected: \(Self.reason(failure))").multilineTextAlignment(.center)

@@ -17,6 +17,8 @@ final class FramebufferRenderer {
     /// moves the window between the Duo's displays).
     private var pending = 0
     private var textureSurface: IOSurface?
+    /// Video frames cycle through a small pool of surfaces: one texture each, made once.
+    private var textures: [ObjectIdentifier: MTLTexture] = [:]
 
     init?() {
         guard let device = MTLCreateSystemDefaultDevice(),
@@ -176,15 +178,23 @@ fragment float4 framebufferFragment(VOut in [[stage_in]],
     }
 
     func setSurface(_ box: SurfaceBox?) {
-        guard let box else { texture = nil; textureSurface = nil; return }
+        guard let box else { texture = nil; textureSurface = nil; textures.removeAll(); return }
         guard box.surface !== textureSurface else { return }
-        let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm,
-                                                         width: box.surface.width,
-                                                         height: box.surface.height,
-                                                         mipmapped: false)
-        d.usage = .shaderRead
-        d.storageMode = .shared
-        texture = device.makeTexture(descriptor: d, iosurface: box.surface, plane: 0)
+        // A cached texture holds its surface, so an identifier can't be reused while it's cached.
+        let key = ObjectIdentifier(box.surface)
+        if let cached = textures[key] {
+            texture = cached
+        } else {
+            let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm,
+                                                             width: box.surface.width,
+                                                             height: box.surface.height,
+                                                             mipmapped: false)
+            d.usage = .shaderRead
+            d.storageMode = .shared
+            texture = device.makeTexture(descriptor: d, iosurface: box.surface, plane: 0)
+            if textures.count >= 12 { textures.removeAll() }
+            textures[key] = texture
+        }
         textureSurface = box.surface
     }
 

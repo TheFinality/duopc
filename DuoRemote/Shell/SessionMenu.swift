@@ -26,6 +26,11 @@ struct SessionMenu: View {
             Toggle(isOn: $autoCompose) {
                 Label("Text box on click into text", systemImage: "character.cursor.ibeam")
             }
+            if coordinator.activeHost?.isDirect == true {
+                Toggle(isOn: Binding(get: { session.isVideo }, set: { coordinator.setVideoStreaming($0) })) {
+                    Label("Video streaming", systemImage: "play.rectangle")
+                }
+            }
             Picker(selection: $pictureQuality) {
                 ForEach(PictureQuality.allCases) { Text($0.title).tag($0) }
             } label: {

@@ -139,4 +139,13 @@ struct HostsTests {
 private struct StubProbe: ReachabilityProbe {
     let online: Set<String>
     func isReachable(hostname: String, port: UInt16) async -> Bool { online.contains(hostname) }
+
+    @Test func pairedPCsUseVideoUnlessTurnedOff() {
+        var host = Host(name: "PC", hostname: "myhome.example.net", port: 5960, username: "")
+        #expect(!host.usesVideo)                     // not paired: VNC
+        host.gatewayCertificateSHA256 = Self.fingerprint
+        #expect(host.usesVideo)                      // paired: video by default
+        host.videoStreaming = false
+        #expect(!host.usesVideo)
+    }
 }

@@ -120,3 +120,22 @@ struct FramePresenterTests {
         #expect(pixel(front, 40, 20) == 1)
     }
 }
+
+/// The video stream's wire format is little-endian (windows/DuoPCStreamer/Protocol.cs).
+struct StreamWireTests {
+    @Test func littleEndianRoundTrips() {
+        var data = Data([0xFF])
+        data.appendLE(UInt32(0x0102_0304))
+        data.appendLE(Int16(-120))
+        #expect(data == Data([0xFF, 0x04, 0x03, 0x02, 0x01, 0x88, 0xFF]))
+        #expect(data.readLE(UInt32.self, at: 1) == 0x0102_0304)
+        #expect(Int16(bitPattern: data.readLE(UInt16.self, at: 5)) == -120)
+    }
+
+    @Test func readsFromASliceByItsOwnOffsets() {
+        let whole = Data([0, 0, 0x2A, 0, 0, 0])
+        let slice = whole[2...]                       // startIndex 2
+        #expect(slice.readLE(UInt32.self, at: 0) == 0x2A)
+    }
+}
+

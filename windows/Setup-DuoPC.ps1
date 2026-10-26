@@ -60,6 +60,12 @@ $InstallDir = Join-Path $env:ProgramFiles 'DuoPC'
 $GatewayExe = Join-Path $InstallDir 'DuoPCGateway.exe'
 $DataDir = Join-Path $env:ProgramData 'DuoPC'
 $GatewayProject = Join-Path $PSScriptRoot 'DuoPCGateway\DuoPCGateway.csproj'
+$StreamerProject = Join-Path $PSScriptRoot 'DuoPCStreamer\DuoPCStreamer.csproj'
+$StreamerExe = Join-Path $InstallDir 'DuoPCStreamer.exe'
+# FFmpeg captures and encodes the screen for video streaming. 7.1.1's NVIDIA encoder needs driver 570+.
+$FfmpegVersion = '7.1.1'
+$FfmpegExe = Join-Path $InstallDir 'ffmpeg\ffmpeg.exe'
+$MinNvidiaDriver = 570
 $GatewayRule = 'DuoPC-Gateway'
 $OldVncRule = 'DuoPC-VNC'          # from the Tailscale-only version of this script
 $TightVncKey = 'HKLM:\SOFTWARE\TightVNC\Server'
@@ -295,7 +301,9 @@ function Install-Gateway {
     $runtime = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'win-arm64' } else { 'win-x64' }
     & dotnet publish $GatewayProject -c Release -r $runtime --self-contained false -p:PublishSingleFile=true -o $InstallDir --nologo -v quiet
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $GatewayExe)) { throw 'Building the gateway failed (see above).' }
-    Write-Ok "installed to $InstallDir"
+    & dotnet publish $StreamerProject -c Release -r $runtime --self-contained false -p:PublishSingleFile=true -o $InstallDir --nologo -v quiet
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $StreamerExe)) { throw 'Building the streamer failed (see above).' }
+    Write-Ok "installed to $InstallDir (gateway and video streamer)"
 
     & $GatewayExe config --port $Port --vnc-port $VncPort --listen any | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Configuring the gateway failed.' }
@@ -311,6 +319,38 @@ function Install-Gateway {
     & sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/5000/restart/60000 | Out-Null
     Start-Service -Name $ServiceName
     Write-Ok "running as a service on port $Port, starts with Windows"
+}
+
+# FFmpeg for video streaming, from winget (which checks the download's hash), copied next to the streamer.
+function Install-Ffmpeg {
+    Write-Step 'FFmpeg (screen capture and video encoding)'
+    if (Test-Path $FfmpegExe) { Write-Ok "already installed: $FfmpegExe"; return }
+    $packages = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages'
+    $find = { Get-ChildItem $packages -Directory -Filter 'Gyan.FFmpeg*' -ErrorAction SilentlyContinue |
+              Get-ChildItem -Recurse -Filter ffmpeg.exe -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -match [regex]::Escape("ffmpeg-$FfmpegVersion-") } | Select-Object -First 1 }
+    $found = & $find
+    if (-not $found) {
+        & winget install --id Gyan.FFmpeg -e --version $FfmpegVersion --silent --accept-package-agreements --accept-source-agreements | Out-Null
+        $found = & $find
+    }
+    if (-not $found) { Write-Warn "Couldn't install FFmpeg $FfmpegVersion; video streaming won't work until it's in $FfmpegExe. VNC still works."; return }
+    New-Item -ItemType Directory -Force -Path (Split-Path $FfmpegExe) | Out-Null
+    Copy-Item $found.FullName $FfmpegExe -Force
+    Write-Ok "FFmpeg $FfmpegVersion installed"
+}
+
+# Video streaming uses the NVIDIA encoder, through FFmpeg, which needs a recent driver.
+function Test-NvidiaDriver {
+    $smi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
+    if (-not $smi) { Write-Warn 'No NVIDIA graphics card found: video streaming needs one (for its hardware encoder). VNC still works.'; return $false }
+    $version = (& nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>$null | Select-Object -First 1).Trim()
+    if ([double]::TryParse(($version -split '\.')[0], [ref]$null) -and [int](($version -split '\.')[0]) -ge $MinNvidiaDriver) {
+        Write-Ok "NVIDIA driver $version"
+        return $true
+    }
+    Write-Warn "NVIDIA driver $version is too old for video streaming (needs $MinNvidiaDriver or newer). Update it with the NVIDIA App or from nvidia.com; VNC works meanwhile."
+    return $false
 }
 
 function Set-GatewayFirewall {
@@ -413,6 +453,17 @@ function Invoke-Check {
         }
     } catch { Write-Bad "gateway: $($_.Exception.Message)"; $healthy = $false }
 
+    Write-Step 'Video streaming'
+    if (Test-Path $StreamerExe) { Write-Ok 'streamer installed' } else { Write-Bad 'streamer not installed (run this script without -Check)'; $healthy = $false }
+    if (Test-Path $FfmpegExe) {
+        Write-Ok 'FFmpeg installed'
+        if (Test-NvidiaDriver) {
+            # Encode one tiny frame with the NVIDIA encoder: proves it works without capturing anything.
+            & $FfmpegExe -hide_banner -loglevel error -f lavfi -i color=black:s=256x256 -frames:v 1 -c:v hevc_nvenc -f null - 2>$null
+            if ($LASTEXITCODE -eq 0) { Write-Ok 'the NVIDIA video encoder works' } else { Write-Bad "the NVIDIA video encoder didn't start"; $healthy = $false }
+        }
+    } else { Write-Bad 'FFmpeg not installed (run this script without -Check)'; $healthy = $false }
+
     Write-Step 'Windows Firewall'
     $rule = Get-NetFirewallRule -Name $GatewayRule -ErrorAction SilentlyContinue
     if ($rule -and $rule.Enabled -eq 'True') { Write-Ok "rule 'DuoPC Gateway' is on" } else { Write-Bad "rule 'DuoPC Gateway' missing or off"; $healthy = $false }
@@ -434,6 +485,9 @@ function Invoke-Install {
     Install-TightVnc $password
     Install-Gateway
     & $GatewayExe config --vnc-password $password | Out-Null
+    Install-Ffmpeg
+    Write-Step 'Graphics driver'
+    [void](Test-NvidiaDriver)
 
     Write-Step 'Checking it works'
     $probe = Test-RfbServer -Address 127.0.0.1 -Port $VncPort -Password $password

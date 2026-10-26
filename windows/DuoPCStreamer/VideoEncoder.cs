@@ -26,7 +26,8 @@ public sealed class VideoEncoder : IDisposable
 
     public static string[] Arguments(int bitrateKbps, int fps, bool software)
     {
-        var grab = $"ddagrab=output_idx=0:framerate={fps}:draw_mouse=1:dup_frames=0";
+        // No pointer in the video: the app draws its own, which moves the instant the finger does.
+        var grab = $"ddagrab=output_idx=0:framerate={fps}:draw_mouse=0:dup_frames=0";
         var common = new[] { "-hide_banner", "-loglevel", "error", "-nostdin", "-f", "lavfi", "-i", grab };
         // Short buffer: about two frames' worth, so a burst can't queue up latency.
         var buffer = Math.Max(bitrateKbps * 2 / Math.Max(fps, 1), 500);
