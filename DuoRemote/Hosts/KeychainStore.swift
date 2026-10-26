@@ -112,4 +112,14 @@ extension KeychainStore {
     func password(forHostID id: UUID) throws -> String? { try get(key: id.uuidString) }
     func setPassword(_ password: String, forHostID id: UUID) throws { try set(password, key: id.uuidString) }
     func deletePassword(forHostID id: UUID) throws { try delete(key: id.uuidString) }
+
+    /// A paired gateway's token, filed next to the password.
+    static func gatewayTokenKey(forHostID id: UUID) -> String { id.uuidString + ".gateway" }
+    func gatewayToken(forHostID id: UUID) throws -> Data? {
+        try get(key: Self.gatewayTokenKey(forHostID: id)).flatMap { Data(base64Encoded: $0) }
+    }
+    func setGatewayToken(_ token: Data, forHostID id: UUID) throws {
+        try set(token.base64EncodedString(), key: Self.gatewayTokenKey(forHostID: id))
+    }
+    func deleteGatewayToken(forHostID id: UUID) throws { try delete(key: Self.gatewayTokenKey(forHostID: id)) }
 }

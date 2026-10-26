@@ -31,7 +31,9 @@ the simulator. Never commit a team ID, a bundle ID or `Config/Local.xcconfig`.
 | `DuoRemote/Theme/` | The sky palette and deck effects |
 | `DuoRemoteTests/` | Swift Testing tests for the pure logic |
 | `Vendor/RoyalVNCKit/` | Vendored, patched RoyalVNCKit 1.1.0 |
-| `windows/` | `Setup-DuoPC.ps1`: installs and locks down TightVNC on the PC (Windows PowerShell 5.1) |
+| `windows/` | `Setup-DuoPC.ps1` (Windows PowerShell 5.1): TightVNC locked to 127.0.0.1, plus the gateway service |
+| `windows/DuoPCGateway/` | The gateway (C#, .NET 8): TLS 1.3 + pairing tokens in front of TightVNC. Never log tokens or passwords |
+| `windows/tests/` | Gateway end-to-end test: `run-gateway-test.ps1` (loopback only, temporary data folder) |
 
 ## Rules
 
@@ -47,9 +49,12 @@ the simulator. Never commit a team ID, a bundle ID or `Config/Local.xcconfig`.
 
 ## Security invariants (don't weaken these)
 
-- A saved password goes out automatically only over Tailscale (`CredentialPolicy`, `Tailnet.route`), and the app
-  connects to the address it checked. Every connect, retry and reconnect goes through that check.
-- Passwords live only in the Keychain (`WhenUnlockedThisDeviceOnly`). Never log passwords, typed text, clipboard
+- Paired PCs (`Host.isDirect`) connect only through DuoPC Gateway: TLS 1.3 pinned to the paired certificate's SHA-256
+  (`VNCConnection.gateway`, Vendor patch 8), then the pairing token. Never fall back to plain VNC for them, and never
+  accept a different certificate without a new pairing.
+- For PCs without pairing, a saved password goes out automatically only over Tailscale (`CredentialPolicy`,
+  `Tailnet.route`), and the app connects to the address it checked. Every connect, retry and reconnect goes through that check.
+- Passwords and pairing tokens live only in the Keychain (`WhenUnlockedThisDeviceOnly`). Never log passwords, typed text, clipboard
   contents or screen contents; log counts at most.
 - Clipboard writes are local-only and expire. Paste to PC never presses Return and confirms long or multi-line text.
 - The privacy cover hides the app in the app switcher. Debug-only code stays behind `#if DEBUG`.

@@ -19,6 +19,11 @@ nonisolated final class DirtyFlag: @unchecked Sendable {
     func testAndClear() -> Bool { lock.lock(); defer { dirty = false; lock.unlock() }; return dirty }
 }
 
+/// Why a gateway connection was turned down, when it was.
+nonisolated enum GatewayIssue: Sendable, Equatable {
+    case certificateMismatch, notPaired
+}
+
 /// RoyalVNCKit's delegate. Called on background threads (and synchronously on the caller's
 /// thread for `.connecting` / user disconnects), so it is nonisolated and hops to the main actor
 /// in FIFO order. Framebuffer rect updates do NOT hop: they only set the dirty flag.
@@ -61,10 +66,14 @@ nonisolated final class ConnectionBridge: NSObject, VNCConnectionDelegate, VNCCo
         var noAcceptedSignIn = false
         if case .authentication(.clientCouldNotDecideOnSecurityType)? = error as? VNCError { noAcceptedSignIn = true }
         let refused = refusedAuth.withLock { $0 } || noAcceptedSignIn
+        var gatewayIssue: GatewayIssue?
+        if case .connection(.gatewayCertificateMismatch)? = error as? VNCError { gatewayIssue = .certificateMismatch }
+        if case .connection(.gatewayRejected)? = error as? VNCError { gatewayIssue = .notPaired }
         let name = ["disconnected", "connecting", "connected", "disconnecting"][min(status.rawValue, 3)]
         log?("state \(name) \(message ?? "")")
         onMain { session, bridge in
-            session.bridge(bridge, didChange: status, authFailed: isAuth, authRefused: refused, message: message)
+            session.bridge(bridge, didChange: status, authFailed: isAuth, authRefused: refused,
+                           gatewayIssue: gatewayIssue, message: message)
         }
     }
 

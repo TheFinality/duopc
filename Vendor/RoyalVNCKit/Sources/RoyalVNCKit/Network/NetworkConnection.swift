@@ -35,6 +35,10 @@ struct NetworkConnectionSettings {
 
     let host: String
     let port: UInt16
+
+    // LOCAL PATCH: DuoPC Gateway. Non-nil = TLS 1.3 with this certificate pin.
+    var gateway: VNCGatewaySettings? = nil
+    var gatewayPinCheck: VNCGatewayPinCheck? = nil
 }
 
 protocol NetworkConnection: NetworkConnectionReading, NetworkConnectionWriting {

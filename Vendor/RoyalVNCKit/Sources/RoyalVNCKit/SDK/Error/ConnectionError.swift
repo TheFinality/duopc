@@ -11,6 +11,10 @@ public extension VNCError {
 		case closedDuringHandshake(handshakingPhase: String, underlyingError: Error?)
 		case cancelled
 		case failed(_ underlyingError: Error?)
+		// LOCAL PATCH: DuoPC Gateway. The server's certificate isn't the paired one.
+		case gatewayCertificateMismatch
+		// LOCAL PATCH: DuoPC Gateway. The gateway doesn't know this device's pairing token.
+		case gatewayRejected
 
 		// MARK: - LocalizedError
 		public var errorDescription: String? {
@@ -28,6 +32,10 @@ public extension VNCError {
 				case .failed(let underlyingError):
 					return VNCError.combinedErrorDescription("The Connection failed.",
 															 underlyingError: underlyingError)
+				case .gatewayCertificateMismatch:
+					return "The server's certificate isn't the one this device was paired with."
+				case .gatewayRejected:
+					return "The gateway didn't accept this device's pairing."
 			}
 		}
 	}

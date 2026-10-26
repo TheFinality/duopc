@@ -1,5 +1,7 @@
 @preconcurrency import RoyalVNCKit
 import SwiftUI
+import Vision
+import VisionKit
 import os
 
 /// The home screen: a hero header, one card per saved PC, and a Help row.
@@ -316,7 +318,8 @@ private struct HostCard: View {
     @State private var taps = 0
 
     private var subtitle: String {
-        host.username.isEmpty ? host.hostname : "\(host.hostname) · \(host.username)"
+        if host.isDirect { return "\(host.hostname) · direct" }
+        return host.username.isEmpty ? host.hostname : "\(host.hostname) · \(host.username)"
     }
 
     private var lastConnectedText: String {
@@ -424,11 +427,11 @@ private struct GettingStartedSteps: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             step(1, "Set up your PC",
-                 "On your PC, run Setup-DuoPC.ps1 from this app's repo. It installs the free TightVNC server, sets its password and lets in only your Tailscale devices.")
-            step(2, "Connect the two",
-                 "Install [Tailscale](https://tailscale.com) on your \(AppInfo.device) and PC, signed in to the same account. Turn on MagicDNS and use your PC's name.")
-            step(3, "Add your PC",
-                 "Add your PC here and sign in with the VNC password you chose.")
+                 "On your PC, run Setup-DuoPC.ps1 as administrator. It installs the free TightVNC server and DuoPC Gateway, an encrypted way in, and shows a QR code.")
+            step(2, "Open a port",
+                 "To connect away from home, forward the gateway's port (5960) on your router to your PC. The script tells you what to enter.")
+            step(3, "Scan the code",
+                 "Tap Add PC, then Scan pairing code. That's all: the code carries everything, password included.")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -539,6 +542,12 @@ struct HostEditor: View {
     @State private var passwordLoaded: Bool
     @State private var allowOutside: Bool
     @State private var showErrors = false
+    /// The paired gateway's certificate (hex); nil = plain VNC.
+    @State private var pairedFingerprint: String?
+    /// A token from a pairing code scanned in this editor, saved to the Keychain on Save.
+    @State private var newToken: Data?
+    @State private var showScanner = false
+    @State private var pairingError: String?
 
     init(host: Host?, store: HostStore) {
         self.host = host
@@ -552,6 +561,7 @@ struct HostEditor: View {
         _symbol = State(initialValue: host?.symbolName ?? HostSymbol.defaultName)
         _passwordLoaded = State(initialValue: host == nil)
         _allowOutside = State(initialValue: host?.allowOutsideTailscale ?? false)
+        _pairedFingerprint = State(initialValue: host?.gatewayCertificateSHA256)
     }
 
     private var port: UInt16? {
@@ -578,6 +588,7 @@ struct HostEditor: View {
     var body: some View {
         NavigationStack {
             Form {
+                pairingSection
                 Section("PC") {
                     TextField("Name", text: $name)
                     if showErrors, let nameError { ErrorText(nameError) }
@@ -609,10 +620,12 @@ struct HostEditor: View {
                 } footer: {
                     Text("With Tailscale, use the PC's MagicDNS name (for example my-pc). Turn on MagicDNS in the Tailscale admin console under DNS. An IP address works too. Your password is stored in this \(AppInfo.device)'s Keychain. Leave the username empty unless your PC runs UltraVNC with Windows sign-in.")
                 }
-                Section {
-                    Toggle("Allow outside Tailscale", isOn: $allowOutside)
-                } footer: {
-                    Text("Normally your saved password is sent only when this PC is reached through Tailscale. Turn this on to also send it over other networks, or to a PC that asks for no sign-in at all. VNC doesn't encrypt your screen or keystrokes, and on a network you don't trust a fake server could capture your password.")
+                if pairedFingerprint == nil {
+                    Section {
+                        Toggle("Allow outside Tailscale", isOn: $allowOutside)
+                    } footer: {
+                        Text("Normally your saved password is sent only when this PC is reached through Tailscale. Turn this on to also send it over other networks, or to a PC that asks for no sign-in at all. VNC doesn't encrypt your screen or keystrokes, and on a network you don't trust a fake server could capture your password.")
+                    }
                 }
             }
             .navigationTitle(host == nil ? "New PC" : "Edit PC")
@@ -626,6 +639,66 @@ struct HostEditor: View {
                 }
             }
             .task { await loadPassword() }
+            .sheet(isPresented: $showScanner) {
+                PairingScanner { text in
+                    showScanner = false
+                    applyPairing(text)
+                }
+            }
+        }
+    }
+
+    // MARK: Pairing with DuoPC Gateway
+
+    private var pairingSection: some View {
+        Section {
+            if let pairedFingerprint {
+                LabeledContent {
+                    Text(PairingCode.shortFingerprint(pairedFingerprint)).font(.footnote.monospaced())
+                } label: {
+                    Label("Direct, encrypted", systemImage: "lock.fill")
+                }
+            }
+            if DataScannerViewController.isSupported {
+                Button(pairedFingerprint == nil ? "Scan pairing code" : "Pair again", systemImage: "qrcode.viewfinder") {
+                    showScanner = true
+                }
+            }
+            PasteButton(payloadType: String.self) { strings in
+                let text = strings.first ?? ""
+                Task { @MainActor in applyPairing(text) }
+            }
+            if pairedFingerprint != nil {
+                Button("Unpair", systemImage: "lock.open", role: .destructive) {
+                    pairedFingerprint = nil
+                    newToken = nil
+                }
+            }
+            if let pairingError { ErrorText(pairingError) }
+        } header: {
+            Text("DuoPC Gateway")
+        } footer: {
+            Text(pairedFingerprint == nil
+                 ? "Setup-DuoPC.ps1 shows a QR code on your PC. Scan it (or copy the code and Paste) to connect directly and encrypted, at home or away, without Tailscale."
+                 : "Connects only to the PC with this certificate, encrypted with TLS 1.3, from any network.")
+        }
+    }
+
+    private func applyPairing(_ text: String) {
+        guard let code = PairingCode.parse(text) else {
+            pairingError = "That isn't a DuoPC pairing code. Copy the whole line that starts with duopc://"
+            return
+        }
+        pairingError = nil
+        if host == nil || name.trimmingCharacters(in: .whitespaces).isEmpty { name = code.name }
+        hostname = code.hostname
+        portText = String(code.port)
+        pairedFingerprint = code.certificateSHA256
+        newToken = code.token
+        username = ""
+        if let vncPassword = code.vncPassword {
+            password = vncPassword
+            passwordLoaded = true
         }
     }
 
@@ -649,8 +722,22 @@ struct HostEditor: View {
         result.username = username.trimmingCharacters(in: .whitespaces)
         result.symbol = symbol
         result.allowOutsideTailscale = allowOutside
+        result.gatewayCertificateSHA256 = pairedFingerprint
 
         if host == nil { store.add(result) } else { store.update(result) }
+
+        let tokenKeychain = store.keychain
+        let tokenHostID = result.id
+        let token = newToken
+        let unpaired = pairedFingerprint == nil
+        Task {
+            do {
+                if let token { try await tokenKeychain.setGatewayToken(token, forHostID: tokenHostID) }
+                else if unpaired { try await tokenKeychain.deleteGatewayToken(forHostID: tokenHostID) }
+            } catch {
+                Logger.keychain.error("Couldn't update the pairing token: \(String(describing: error), privacy: .public)")
+            }
+        }
 
         if passwordLoaded {
             let keychain = store.keychain
@@ -712,5 +799,64 @@ private struct SymbolPicker: View {
         }
         .padding(.vertical, 4)
         .sensoryFeedback(.selection, trigger: selection)
+    }
+}
+
+// MARK: - Pairing scanner
+
+/// The camera, looking for a DuoPC pairing QR code. Calls `onFound` once, with the first valid one.
+private struct PairingScanner: View {
+    let onFound: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            PairingScannerView(onFound: onFound)
+                .ignoresSafeArea()
+                .navigationTitle("Scan pairing code")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                }
+        }
+    }
+}
+
+private struct PairingScannerView: UIViewControllerRepresentable {
+    let onFound: (String) -> Void
+
+    func makeUIViewController(context: Context) -> DataScannerViewController {
+        let scanner = DataScannerViewController(recognizedDataTypes: [.barcode(symbologies: [.qr])],
+                                                qualityLevel: .balanced,
+                                                recognizesMultipleItems: false,
+                                                isHighFrameRateTrackingEnabled: false,
+                                                isHighlightingEnabled: true)
+        scanner.delegate = context.coordinator
+        return scanner
+    }
+
+    func updateUIViewController(_ scanner: DataScannerViewController, context: Context) {
+        if !scanner.isScanning { try? scanner.startScanning() }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(onFound: onFound) }
+
+    final class Coordinator: NSObject, DataScannerViewControllerDelegate {
+        private let onFound: (String) -> Void
+        private var found = false
+
+        init(onFound: @escaping (String) -> Void) { self.onFound = onFound }
+
+        func dataScanner(_ dataScanner: DataScannerViewController, didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {
+            guard !found else { return }
+            for item in addedItems {
+                guard case .barcode(let barcode) = item, let text = barcode.payloadStringValue,
+                      PairingCode.parse(text) != nil else { continue }
+                found = true
+                dataScanner.stopScanning()
+                onFound(text)
+                return
+            }
+        }
     }
 }

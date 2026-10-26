@@ -31,3 +31,7 @@ Config/Local.xcconfig
 .claude/
 .idea/
 .vscode/
+
+# DuoPC Gateway build output
+windows/DuoPCGateway/bin/
+windows/DuoPCGateway/obj/

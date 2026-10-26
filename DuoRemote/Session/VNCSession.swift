@@ -30,6 +30,10 @@ final class VNCSession {
         case outsideTailscale
         /// The PC offered no sign-in at all, or a kind a Windows VNC server doesn't use.
         case insecureAuthentication
+        /// The gateway's certificate isn't the paired one: another server, or the PC was set up again.
+        case gatewayCertificateMismatch
+        /// The gateway doesn't know this phone (unpaired with `revoke`, or the token is missing).
+        case gatewayRejected
     }
 
     let hostname: String
@@ -113,9 +117,11 @@ final class VNCSession {
     /// - Parameters:
     ///   - address: the already-checked address to connect to, instead of resolving `hostname` again.
     ///   - allowOtherAuth: answer sign-in requests other than a Windows VNC one, or none at all.
-    func connect(username: String, password: String, address: String? = nil, allowOtherAuth: Bool = false) {
+    ///   - gateway: connect through a paired DuoPC Gateway (pinned TLS 1.3 + pairing token).
+    func connect(username: String, password: String, address: String? = nil, allowOtherAuth: Bool = false,
+                 gateway: VNCGatewaySettings? = nil) {
         connect(credentials: .init(username: username, password: password), address: address,
-                allowOtherAuth: allowOtherAuth, log: { [weak self] line in
+                allowOtherAuth: allowOtherAuth, gateway: gateway, log: { [weak self] line in
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.note(line) } }
         })
     }
@@ -128,7 +134,7 @@ final class VNCSession {
 
     /// `credentials == nil` → the auth request is answered with nothing (smoke test).
     func connect(credentials: ConnectionBridge.Credentials?, address: String? = nil, allowOtherAuth: Bool = false,
-                 log: (@Sendable (String) -> Void)? = nil) {
+                 gateway: VNCGatewaySettings? = nil, log: (@Sendable (String) -> Void)? = nil) {
         guard !isDemo else { return }
         tearDown()
         self.log = log
@@ -144,6 +150,8 @@ final class VNCSession {
                                               frameEncodings: .default)
         let connection = VNCConnection(settings: settings)
         connection.isUnauthenticatedAccessAllowed = allowOtherAuth   // a PC with no sign-in at all
+        connection.gateway = gateway
+        if gateway != nil { note("direct: TLS 1.3, pinned certificate") }
         let bridge = ConnectionBridge(session: self, credentials: credentials, allowOtherAuth: allowOtherAuth,
                                       dirty: frameDirty, log: log)
         connection.delegate = bridge
@@ -183,7 +191,8 @@ final class VNCSession {
 
     // Called by ConnectionBridge on the main actor. Callbacks from a superseded connection are dropped.
 
-    func bridge(_ b: ConnectionBridge, didChange s: VNCConnection.Status, authFailed: Bool, authRefused: Bool, message: String?) {
+    func bridge(_ b: ConnectionBridge, didChange s: VNCConnection.Status, authFailed: Bool, authRefused: Bool,
+                gatewayIssue: GatewayIssue?, message: String?) {
         guard b === bridge else { return }
         switch s {
         case .connecting: status = .connecting
@@ -191,6 +200,8 @@ final class VNCSession {
         case .disconnecting: break
         case .disconnected:
             if userDisconnecting { status = .disconnected(nil) }
+            else if gatewayIssue == .certificateMismatch { status = .disconnected(.gatewayCertificateMismatch) }
+            else if gatewayIssue == .notPaired { status = .disconnected(.gatewayRejected) }
             else if authRefused { status = .disconnected(.insecureAuthentication) }
             else if authFailed { status = .disconnected(.authenticationFailed) }
             else if let message { status = .disconnected(.network(message)) }

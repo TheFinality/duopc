@@ -35,6 +35,10 @@ public final class VNCConnection: NSObjectOrAnyObject {
 	// Off by default; set before connect().
 	public var isUnauthenticatedAccessAllowed = false
 
+	// LOCAL PATCH: connect through a DuoPC Gateway (pinned TLS 1.3 + pairing token). Set before connect().
+	public var gateway: VNCGatewaySettings?
+	let gatewayPinCheck = VNCGatewayPinCheck()
+
 #if canImport(ObjectiveC)
 	@objc
 #endif
@@ -81,7 +85,9 @@ public final class VNCConnection: NSObjectOrAnyObject {
     lazy var connection: some NetworkConnection = {
         let connectionSettings = NetworkConnectionSettings(connectionTimeout: 15,
                                                            host: settings.hostname,
-                                                           port: settings.port)
+                                                           port: settings.port,
+                                                           gateway: gateway,
+                                                           gatewayPinCheck: gatewayPinCheck)
 
         // NOTE: To test SocketNetworkConnection on Darwin (macOS, iOS, etc.), comment out the the #if
 #if canImport(Network)
@@ -372,6 +378,7 @@ private extension VNCConnection {
 	func connectionDidBecomeReady() {
 		Task {
 			do {
+				if let gateway { try await sendGatewayHello(gateway) }
 				try await handshake()
 				try await sendFramebufferUpdateRequest()
 			} catch {
@@ -388,6 +395,24 @@ private extension VNCConnection {
 	}
 
 	func connectionDidFail(error: VNCError) {
-		handleBreakingError(error)
+		// LOCAL PATCH: a pin mismatch surfaces as a generic TLS failure; say what it really is.
+		handleBreakingError(gatewayPinCheck.didMismatch ? .connection(.gatewayCertificateMismatch) : error)
+	}
+
+	// LOCAL PATCH: DuoPC Gateway hello, before the VNC handshake.
+	func sendGatewayHello(_ gateway: VNCGatewaySettings) async throws {
+		try await connection.write(data: gateway.hello)
+		let reply: UInt8
+		do {
+			reply = try await connection.readUInt8()
+		} catch {
+			// A gateway that hangs up without a reply has blocked this address or isn't running.
+			throw VNCError.ConnectionError.closedDuringHandshake(handshakingPhase: "Gateway Pairing", underlyingError: error)
+		}
+		switch reply {
+			case VNCGatewaySettings.accepted: return
+			case VNCGatewaySettings.rejected: throw VNCError.connection(.gatewayRejected)
+			default: throw VNCError.protocol(.invalidData)
+		}
 	}
 }

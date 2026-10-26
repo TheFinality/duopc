@@ -82,6 +82,8 @@ struct CredentialPolicyTests {
     @Test func blockedFailuresDontRetry() {
         #expect(!RetryPolicy.shouldRetry(.outsideTailscale))
         #expect(!RetryPolicy.shouldRetry(.insecureAuthentication))
+        #expect(!RetryPolicy.shouldRetry(.gatewayCertificateMismatch))
+        #expect(!RetryPolicy.shouldRetry(.gatewayRejected))
     }
 
     @Test func credentialsCapAt63BytesOnACharacterBoundary() {

@@ -53,7 +53,7 @@ struct WelcomeSheet: View {
                 .accessibilityHidden(true)
             Text("Welcome to \(AppInfo.name)")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
-            Text("See and control your Windows PC from your \(AppInfo.device), through a VNC server on the PC, such as the free TightVNC.")
+            Text("See and control your Windows PC from your \(AppInfo.device), at home or away, over an encrypted connection straight to your PC.")
                 .font(.body)
                 .foregroundStyle(.secondary)
         }
@@ -63,11 +63,11 @@ struct WelcomeSheet: View {
         WelcomeCard(title: "Set up in 3 steps", symbol: "list.number") {
             VStack(alignment: .leading, spacing: 16) {
                 step(1, "Set up your PC",
-                     "On your PC, run Setup-DuoPC.ps1 from this app's repo. It installs the free TightVNC server, sets its password and lets in only your Tailscale devices.")
-                step(2, "Connect the two",
-                     "Install [Tailscale](https://tailscale.com) on your PC and \(AppInfo.device) to connect from anywhere. Turn on MagicDNS so you can use your PC's name instead of its IP address. The setup script only lets in Tailscale devices.")
-                step(3, "Add your PC",
-                     "Tap + on the home screen, then sign in with the VNC password you chose.")
+                     "On your PC, run Setup-DuoPC.ps1 as administrator. It installs the free TightVNC server and DuoPC Gateway, an encrypted way in, and shows a QR code.")
+                step(2, "Open a port",
+                     "To connect away from home, forward the gateway's port (5960) on your router to your PC. The script tells you what to enter.")
+                step(3, "Scan the code",
+                     "Tap + on the home screen, then Scan pairing code.")
             }
         }
     }
@@ -126,9 +126,9 @@ struct WelcomeSheet: View {
     private var securityCard: some View {
         WelcomeCard(title: "Good to know", symbol: "lock.shield") {
             VStack(alignment: .leading, spacing: 12) {
-                point("VNC doesn't encrypt what's on your screen or what you type. Tailscale encrypts the whole connection, so use it.")
-                point("The app can't verify the identity of the PC it connects to. If you connect outside Tailscale, a fake server on that network could capture your VNC password.")
-                point("So a saved password is sent only when your PC is reached through Tailscale. Anywhere else, the app asks first.")
+                point("Paired PCs: everything is encrypted with TLS 1.3, and the app talks only to the PC whose certificate it paired with, so a fake server gets nothing.")
+                point("The gateway lets in only paired phones, and blocks an address for an hour after repeated wrong tries. TightVNC itself can't be reached from the network at all.")
+                point("PCs added by hand, without pairing, use plain VNC, which isn't encrypted. For those, a saved password is sent only over Tailscale; anywhere else the app asks first.")
                 point("Passwords stay in this \(AppInfo.device)'s Keychain.")
                 point("No accounts, no analytics, no servers.")
             }

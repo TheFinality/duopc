@@ -1,3 +1,4 @@
+@preconcurrency import RoyalVNCKit
 import SwiftUI
 import UIKit
 import Observation
@@ -16,7 +17,8 @@ enum RetryPolicy {
     static func shouldRetry(_ failure: VNCSession.Failure?) -> Bool {
         switch failure {
         case .network, .closedByServer: true
-        case .authenticationFailed, .outsideTailscale, .insecureAuthentication, nil: false
+        case .authenticationFailed, .outsideTailscale, .insecureAuthentication,
+             .gatewayCertificateMismatch, .gatewayRejected, nil: false
         }
     }
 }
@@ -110,6 +112,10 @@ final class SessionCoordinator {
         lookingUpHostID = host.id
         connectTask = Task {
             defer { if !Task.isCancelled { lookingUpHostID = nil } }
+            if host.isDirect {
+                await startDirect(host, given: given)
+                return
+            }
             let route = await Tailnet.route(to: host.hostname, port: host.port)
             guard !Task.isCancelled else { return }
             var resolved = given
@@ -140,6 +146,28 @@ final class SessionCoordinator {
         }
     }
 
+    /// A paired gateway proves it's this PC with its pinned certificate, so there's no Tailscale
+    /// check: the password goes only to that certificate's owner, inside TLS, from any network.
+    private func startDirect(_ host: Host, given: Credentials?) async {
+        let keychain = store.keychain
+        let token = (try? await keychain.gatewayToken(forHostID: host.id)) ?? nil
+        guard !Task.isCancelled else { return }
+        guard let pin = host.gatewayPin, let token else {
+            begin(host, credentials: given ?? Credentials(username: "", password: ""), address: nil, blocked: .gatewayRejected)
+            return
+        }
+        var resolved = given
+        if resolved == nil, let saved = (try? await keychain.password(forHostID: host.id)) ?? nil, !saved.isEmpty {
+            resolved = Credentials(username: host.username, password: saved)
+        }
+        guard !Task.isCancelled else { return }
+        guard let resolved else {
+            prompt(host, outsideAddress: nil)
+            return
+        }
+        begin(host, credentials: resolved, address: nil, gateway: VNCGatewaySettings(certificateSHA256: pin, token: token))
+    }
+
     private func prompt(_ host: Host, outsideAddress: String?) {
         outsideTailscaleAddress = outsideAddress
         credentialPrompt = host
@@ -148,7 +176,9 @@ final class SessionCoordinator {
     /// - Parameters:
     ///   - address: the checked address to connect to (nil = let the library resolve the name).
     ///   - blocked: show this failure instead of connecting.
-    private func begin(_ host: Host, credentials: Credentials, address: String?, blocked: VNCSession.Failure? = nil) {
+    ///   - gateway: connect through the paired DuoPC Gateway.
+    private func begin(_ host: Host, credentials: Credentials, address: String?, blocked: VNCSession.Failure? = nil,
+                       gateway: VNCGatewaySettings? = nil) {
         if let current = active, activeHost?.id != host.id { current.disconnect() }
 
         let session: VNCSession
@@ -173,7 +203,7 @@ final class SessionCoordinator {
             case .connecting, .connected: break
             default:
                 session.connect(username: credentials.username, password: credentials.password,
-                                address: address, allowOtherAuth: host.allowOutsideTailscale)
+                                address: address, allowOtherAuth: host.allowOutsideTailscale, gateway: gateway)
             }
         }
         updateIdleTimer()

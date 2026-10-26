@@ -24,6 +24,8 @@
 	<string>1</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>DuoPC uses the camera only to scan the pairing QR code your PC shows.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>DuoPC connects to the VNC server on your Windows PCs, over Tailscale or your local network.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

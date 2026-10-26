@@ -23,3 +23,9 @@ Only `Sources/{RoyalVNCKit,RoyalVNCKitC,Z,d3des}` and `LICENSE` were copied. Eve
    first even when ARD was offered, so a server could skip sign-in. ARD is now preferred, "None" is used only when
    the app allows it (off by default), and Tight (not implemented, so also no sign-in) is never chosen.
 
+8. DuoPC Gateway (`SDK/VNCGateway.swift`, new; `Network/NetworkConnection.swift`, `Network/NWConnection+NetworkConnection.swift`,
+   `SDK/Connection/VNCConnection.swift`, `SDK/Error/ConnectionError.swift`): `VNCConnection.gateway` makes the connection
+   TLS 1.3 with a verify block that accepts only the certificate whose SHA-256 is pinned (no CA, name or expiry check), then
+   sends `"DPC1"` + the 32-byte pairing token and waits for 0x00 (accepted) or 0x01 (→ `ConnectionError.gatewayRejected`)
+   before the VNC handshake. A pin mismatch is reported as `ConnectionError.gatewayCertificateMismatch`. Plain connections
+   (`gateway == nil`) are unchanged.

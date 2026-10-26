@@ -406,6 +406,8 @@ private struct FloatingChrome: View {
         case .network(let m): m
         case .closedByServer: "closed by the PC"
         case .outsideTailscale: "this PC isn't reached through Tailscale, so your saved password wasn't sent"
+        case .gatewayCertificateMismatch: "the PC's certificate isn't the one you paired with. If you set the gateway up again, pair again; otherwise something else is answering at this address, so nothing was sent"
+        case .gatewayRejected: "the gateway doesn't recognise this \(AppInfo.device). Pair again: on the PC run DuoPCGateway pair, then in Edit PC tap Scan pairing code"
         case .insecureAuthentication: "this PC didn't ask for a password (or asked for a kind of sign-in Windows VNC servers don't use), so the app didn't continue. Set a password in your VNC server, or to allow it anyway, turn on Allow outside Tailscale in Edit PC."
         }
     }

@@ -38,10 +38,19 @@ jobs:
           xcodebuild test -project DuoRemote.xcodeproj -scheme DuoRemote \
             -destination "platform=iOS Simulator,name=$sim" CODE_SIGNING_ALLOWED=NO
 
-  windows-script:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Build and test DuoPC Gateway end to end
+        shell: powershell
+        run: ./windows/tests/run-gateway-test.ps1
       - name: Parse Setup-DuoPC.ps1
         shell: powershell
         run: |

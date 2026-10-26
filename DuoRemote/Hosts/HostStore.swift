@@ -42,7 +42,10 @@ final class HostStore {
         let keychain = keychain
         let id = host.id
         Task {
-            do { try await keychain.deletePassword(forHostID: id) } catch {
+            do {
+                try await keychain.deletePassword(forHostID: id)
+                try await keychain.deleteGatewayToken(forHostID: id)
+            } catch {
                 Logger.keychain.error("Couldn't delete a removed PC's password: \(String(describing: error), privacy: .public)")
             }
         }
@@ -53,7 +56,7 @@ final class HostStore {
     func tidyKeychain(defaults: UserDefaults = .standard) async {
         let flag = "keychainInitialised"
         let freshInstall = !defaults.bool(forKey: flag) && !FileManager.default.fileExists(atPath: fileURL.path)
-        let known = Set(hosts.map(\.id.uuidString))
+        let known = Set(hosts.flatMap { [$0.id.uuidString, KeychainStore.gatewayTokenKey(forHostID: $0.id)] })
         do {
             if freshInstall {
                 try await keychain.deleteAll()
