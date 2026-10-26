@@ -97,6 +97,7 @@ GitHub builds the app for you on a cloud Mac. You sign and install it from Windo
 What a free Apple ID means:
 - **The app stops opening after 7 days.** Sideload it again before then (Sideloadly can refresh it automatically while the PC is on). Re-signing with the same Apple ID keeps your paired PCs; a different Apple ID or bundle ID starts fresh, so pair again.
 - At most 3 sideloaded apps at a time, and 10 new app IDs a week.
+- **If the app opens but crashes when you open a PC or the demo**, and the crash log (Settings → Privacy & Security → Analytics & Improvements → Analytics Data → `DuoRemote-…`) says `CODESIGNING` / `Invalid Page`, the copy on the phone was damaged during install. Delete the app and sideload it again.
 - The bundle ID is `io.github.thefinality.duopc` (in `Config/DuoRemote.xcconfig`). If Sideloadly says it's unavailable, change it there and push, or let Sideloadly change it under its advanced options.
 
 ## Build the app with Xcode
