@@ -288,12 +288,12 @@ nonisolated final class HEVCDecoder {
 
 nonisolated extension Data {
     mutating func appendLE<T: FixedWidthInteger>(_ value: T) {
-        withUnsafeBytes(of: value.littleEndian) { append(contentsOf: $0) }
+        Swift.withUnsafeBytes(of: value.littleEndian) { append(contentsOf: $0) }
     }
 
     func readLE<T: FixedWidthInteger>(_: T.Type, at offset: Int) -> T {
         var value = T.zero
-        withUnsafeMutableBytes(of: &value) { target in
+        Swift.withUnsafeMutableBytes(of: &value) { target in
             let start = startIndex + offset
             target.copyBytes(from: self[start..<(start + MemoryLayout<T>.size)])
         }
