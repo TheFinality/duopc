@@ -30,10 +30,12 @@ jobs:
 
       - name: Build a signer on apple-codesign-quick
         run: |
-          command -v cargo || { curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal; }
-          source "$HOME/.cargo/env" 2>/dev/null || true
-          cargo new -q quicksign && cd quicksign
-          cargo add -q apple-codesign-quick@0.1 plist@1
+          # The image has rustup without a toolchain; apple-codesign-quick needs Rust 2024 (1.85+).
+          if command -v rustup; then rustup toolchain install stable --profile minimal && rustup default stable;
+          else curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal; source "$HOME/.cargo/env"; fi
+          cargo --version
+          cargo new quicksign && cd quicksign
+          cargo add apple-codesign-quick@0.1 plist@1
           cat > src/main.rs <<'EOF'
           use apple_codesign_quick::{sign_bundle, BundleSigningSettings};
           fn main() {
@@ -43,7 +45,7 @@ jobs:
               println!("signed {path}");
           }
           EOF
-          cargo build -q --release
+          cargo build --release
           cargo tree -q -i apple-codesign-quick | head -1
 
       - name: Sign and check
