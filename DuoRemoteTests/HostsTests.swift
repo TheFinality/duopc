@@ -134,11 +134,6 @@ struct HostsTests {
         #expect(back.isDirect && back.gatewayPin?.count == 32)
         #expect(PairingCode.shortFingerprint(Self.fingerprint) == "4fd8 3603 5c36 85bb")
     }
-}
-
-private struct StubProbe: ReachabilityProbe {
-    let online: Set<String>
-    func isReachable(hostname: String, port: UInt16) async -> Bool { online.contains(hostname) }
 
     @Test func pairedPCsUseVideoUnlessTurnedOff() {
         var host = Host(name: "PC", hostname: "myhome.example.net", port: 5960, username: "")
@@ -148,4 +143,9 @@ private struct StubProbe: ReachabilityProbe {
         host.videoStreaming = false
         #expect(!host.usesVideo)
     }
+}
+
+private struct StubProbe: ReachabilityProbe {
+    let online: Set<String>
+    func isReachable(hostname: String, port: UInt16) async -> Bool { online.contains(hostname) }
 }
