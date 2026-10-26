@@ -29,7 +29,7 @@ nonisolated final class ConnectionBridge: NSObject, VNCConnectionDelegate, VNCCo
     private let allowOtherAuth: Bool
     private let dirty: DirtyFlag
     private let log: (@Sendable (String) -> Void)?
-    /// Set when the Mac asked for a kind of sign-in we won't answer.
+    /// Set when the PC asked for a kind of sign-in we won't answer.
     private let refusedAuth = OSAllocatedUnfairLock(initialState: false)
     /// Main-actor-only; touched inside main hops.
     nonisolated(unsafe) weak var session: VNCSession?
@@ -74,7 +74,7 @@ nonisolated final class ConnectionBridge: NSObject, VNCConnectionDelegate, VNCCo
         log?("auth requested: \(authenticationType) requiresUsername=\(authenticationType.requiresUsername)")
         guard let credentials else { completion(nil); return }
         guard CredentialPolicy.mayAnswer(authenticationType, allowOutsideTailscale: allowOtherAuth) else {
-            log?("auth refused: not a macOS sign-in, password not sent")
+            log?("auth refused: not a Windows VNC sign-in, password not sent")
             refusedAuth.withLock { $0 = true }
             completion(nil)
             return
@@ -107,7 +107,7 @@ nonisolated final class ConnectionBridge: NSObject, VNCConnectionDelegate, VNCCo
     }
 
     func connection(_ connection: VNCConnection, didReceiveClipboardText text: String) {
-        log?(text.isEmpty ? "clipboard message from Mac (empty)" : "clipboard from Mac: \(text.count) chars")
+        log?(text.isEmpty ? "clipboard message from PC (empty)" : "clipboard from PC: \(text.count) chars")
         onMain { session, bridge in session.bridge(bridge, didReceiveClipboard: text) }
     }
 

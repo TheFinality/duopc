@@ -14,7 +14,7 @@ protocol SessionDisplay: AnyObject {
     func viewportDidChange()
 }
 
-/// One remote Mac. Long-lived: survives reconnects so the viewport and pointer stay put.
+/// One remote PC. Long-lived: survives reconnects so the viewport and pointer stay put.
 @Observable
 final class VNCSession {
     enum Status: Equatable {
@@ -28,7 +28,7 @@ final class VNCSession {
         case closedByServer
         /// Not reached through Tailscale, so the saved password wasn't sent.
         case outsideTailscale
-        /// The Mac asked for a plain VNC password rather than a macOS sign-in.
+        /// The PC offered no sign-in at all, or a kind a Windows VNC server doesn't use.
         case insecureAuthentication
     }
 
@@ -37,7 +37,7 @@ final class VNCSession {
 
     private(set) var status: Status = .idle
     private(set) var framebufferSize: CGSize?
-    /// This Mac's scroll speed (from the ••• menu); nil = the global default.
+    /// This PC's scroll speed (from the ••• menu); nil = the global default.
     var scrollSpeedOverride: Double?
     static let defaultScrollSpeed = 3.0
     static var globalScrollSpeed: Double {
@@ -48,7 +48,7 @@ final class VNCSession {
     let modifiers = ModifierState()
     let isDemo: Bool
 
-    /// The Mac's cursor is the text I-beam (heuristic from its shape).
+    /// The PC's cursor is the text I-beam (heuristic from its shape).
     private(set) var cursorIsTextBeam = false
     /// Bumped when the user clicks into text (I-beam) — the shell opens the compose box.
     private(set) var composeRequests = 0
@@ -112,7 +112,7 @@ final class VNCSession {
 
     /// - Parameters:
     ///   - address: the already-checked address to connect to, instead of resolving `hostname` again.
-    ///   - allowOtherAuth: answer sign-in requests other than a macOS one.
+    ///   - allowOtherAuth: answer sign-in requests other than a Windows VNC one, or none at all.
     func connect(username: String, password: String, address: String? = nil, allowOtherAuth: Bool = false) {
         connect(credentials: .init(username: username, password: password), address: address,
                 allowOtherAuth: allowOtherAuth, log: { [weak self] line in
@@ -143,7 +143,7 @@ final class VNCSession {
                                               colorDepth: .depth24Bit,
                                               frameEncodings: .default)
         let connection = VNCConnection(settings: settings)
-        connection.isUnauthenticatedAccessAllowed = allowOtherAuth   // a Mac with no sign-in at all
+        connection.isUnauthenticatedAccessAllowed = allowOtherAuth   // a PC with no sign-in at all
         let bridge = ConnectionBridge(session: self, credentials: credentials, allowOtherAuth: allowOtherAuth,
                                       dirty: frameDirty, log: log)
         connection.delegate = bridge
@@ -248,7 +248,7 @@ final class VNCSession {
         if button == .left, autoCompose, autoComposeArmed { checkForTextClick() }
     }
 
-    /// After a left click, give the Mac a moment to update the cursor shape; if it's the text
+    /// After a left click, give the PC a moment to update the cursor shape; if it's the text
     /// I-beam, the click was (very likely) into text → ask the shell for the compose box.
     /// The user closed the compose box: don't reopen it until the pointer has left text.
     func composeDismissed() { autoComposeArmed = false }
@@ -326,6 +326,14 @@ final class VNCSession {
         withModifiers { c in codes.forEach(c.tap) }
     }
 
+    /// Holds the shortcut's keys together, then releases them. The sticky modifiers stay as they are.
+    func send(_ shortcut: WindowsShortcut) {
+        guard let c = connection else { return }
+        note("shortcut: \(shortcut.title)")
+        shortcut.keys.forEach { c.keyDown($0) }
+        shortcut.keys.reversed().forEach { c.keyUp($0) }
+    }
+
     private func withModifiers(_ body: (VNCConnection) -> Void) {
         let mods = modifiers.consume()
         guard let c = connection else { return }
@@ -336,18 +344,18 @@ final class VNCSession {
 
     // MARK: Clipboard
 
-    /// iPhone → Mac: types `text` into whatever has focus on the Mac — the same path as the
-    /// compose box. (No clipboard message: macOS Screen Sharing ignores ClientCutText from
-    /// non-Apple clients and can then swallow the keystrokes that follow.)
-    func pasteToMac(_ text: String) {
+    /// iPhone → PC: types `text` into whatever has focus on the PC — the same path as the
+    /// compose box. Typing rather than ClientCutText, because that is Latin-1 only and would mangle
+    /// anything else.
+    func pasteToPC(_ text: String) {
         // Never submit: drop trailing line breaks, and type inner ones as Shift-Return (a soft
         // line break in chat and web apps, an ordinary newline in editors).
         let lines = KeyMapping.pasteLines(text)
         guard !lines.isEmpty, let c = connection else {
-            note("paste to Mac: nothing sent\(connection == nil ? " — not connected" : "")")
+            note("paste to PC: nothing sent\(connection == nil ? " — not connected" : "")")
             return
         }
-        note("paste to Mac: typing \(lines.reduce(0) { $0 + $1.count }) chars")
+        note("paste to PC: typing \(lines.reduce(0) { $0 + $1.count }) chars")
         for (i, line) in lines.enumerated() {
             KeyMapping.keyCodes(for: line).forEach(c.tap)
             if i < lines.count - 1 {
@@ -364,7 +372,7 @@ final class VNCSession {
 
     // MARK: Snapshot
 
-    /// The part of the Mac's screen currently visible on the canvas, as an image (for Live Text).
+    /// The part of the PC's screen currently visible on the canvas, as an image (for Live Text).
     func visibleSnapshot() -> UIImage? {
         guard let box = surface else { return nil }
         let surf = box.surface

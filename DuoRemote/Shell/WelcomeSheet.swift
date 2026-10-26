@@ -12,7 +12,7 @@ struct WelcomeSheet: View {
                 setupCard
                 gesturesCard
                 securityCard
-                Text("Independent project, not affiliated with, sponsored or endorsed by Apple Inc. or Tailscale Inc. Apple, iPhone, Mac and macOS are trademarks of Apple Inc. Tailscale is a trademark of Tailscale Inc. Provided as-is, with no warranty. Use at your own risk, and only with computers you own or are authorised to access.")
+                Text("Independent project, not affiliated with, sponsored or endorsed by Apple Inc. or Tailscale Inc. Apple and iPhone are trademarks of Apple Inc. Windows is a trademark of Microsoft Corporation. Tailscale is a trademark of Tailscale Inc. TightVNC is a trademark of GlavSoft LLC. Provided as-is, with no warranty. Use at your own risk, and only with computers you own or are authorised to access.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 4)
@@ -44,7 +44,7 @@ struct WelcomeSheet: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Image(systemName: "macbook.and.iphone")
+            Image(systemName: "pc")
                 .font(.system(size: 30, weight: .medium))
                 .foregroundStyle(.white)
                 .frame(width: 64, height: 64)
@@ -53,7 +53,7 @@ struct WelcomeSheet: View {
                 .accessibilityHidden(true)
             Text("Welcome to \(AppInfo.name)")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
-            Text("See and control your Mac from your \(AppInfo.device), using the Screen Sharing built into macOS. There is nothing to install on the Mac.")
+            Text("See and control your Windows PC from your \(AppInfo.device), through a VNC server on the PC, such as the free TightVNC.")
                 .font(.body)
                 .foregroundStyle(.secondary)
         }
@@ -62,12 +62,12 @@ struct WelcomeSheet: View {
     private var setupCard: some View {
         WelcomeCard(title: "Set up in 3 steps", symbol: "list.number") {
             VStack(alignment: .leading, spacing: 16) {
-                step(1, "Turn on Screen Sharing",
-                     "On your Mac, open System Settings → General → Sharing and switch on Screen Sharing.")
+                step(1, "Set up your PC",
+                     "On your PC, run Setup-DuoPC.ps1 from this app's repo. It installs the free TightVNC server, sets its password and lets in only your Tailscale devices.")
                 step(2, "Connect the two",
-                     "Install [Tailscale](https://tailscale.com) on your Mac and \(AppInfo.device) to connect from anywhere, or put both on the same network. With Tailscale, turn on MagicDNS so you can use your Mac's name instead of its IP address.")
-                step(3, "Add your Mac",
-                     "Tap + on the home screen, then sign in with your Mac's username and password.")
+                     "Install [Tailscale](https://tailscale.com) on your PC and \(AppInfo.device) to connect from anywhere. Turn on MagicDNS so you can use your PC's name instead of its IP address. The setup script only lets in Tailscale devices.")
+                step(3, "Add your PC",
+                     "Tap + on the home screen, then sign in with the VNC password you chose.")
             }
         }
     }
@@ -99,7 +99,7 @@ struct WelcomeSheet: View {
                 gesture("hand.raised.fingers.spread", "Three-finger drag", "pans when zoomed in")
                 Divider()
                 Label {
-                    Text("**Laptop pose on iPhone Duo.** Fold it halfway: the Mac's screen is on top, and a trackpad and keys are below.")
+                    Text("**Laptop pose on iPhone Duo.** Fold it halfway: the PC's screen is on top, and a trackpad and keys are below.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } icon: {
@@ -126,9 +126,9 @@ struct WelcomeSheet: View {
     private var securityCard: some View {
         WelcomeCard(title: "Good to know", symbol: "lock.shield") {
             VStack(alignment: .leading, spacing: 12) {
-                point("macOS Screen Sharing doesn't encrypt what's on your screen or what you type, beyond the sign-in. Use Tailscale or a network you trust.")
-                point("The app can't verify the identity of the Mac it connects to. If you connect outside Tailscale, a fake server on that network could capture your Mac's password.")
-                point("So a saved password is sent only when your Mac is reached through Tailscale. Anywhere else, the app asks first.")
+                point("VNC doesn't encrypt what's on your screen or what you type. Tailscale encrypts the whole connection, so use it.")
+                point("The app can't verify the identity of the PC it connects to. If you connect outside Tailscale, a fake server on that network could capture your VNC password.")
+                point("So a saved password is sent only when your PC is reached through Tailscale. Anywhere else, the app asks first.")
                 point("Passwords stay in this \(AppInfo.device)'s Keychain.")
                 point("No accounts, no analytics, no servers.")
             }

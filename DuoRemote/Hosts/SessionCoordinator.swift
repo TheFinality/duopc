@@ -29,10 +29,10 @@ final class SessionCoordinator {
     private(set) var activeHost: Host?
     /// Non-nil → the shell presents `CredentialSheet` for this host.
     var credentialPrompt: Host?
-    /// Set with `credentialPrompt` when the Mac isn't reached through Tailscale: the address it
+    /// Set with `credentialPrompt` when the PC isn't reached through Tailscale: the address it
     /// resolved to, so the sheet can warn before a password is sent there.
     private(set) var outsideTailscaleAddress: String?
-    /// The Mac whose address is being looked up and checked, before anything is sent to it.
+    /// The PC whose address is being looked up and checked, before anything is sent to it.
     private(set) var lookingUpHostID: UUID?
 
     private struct Credentials {
@@ -58,7 +58,7 @@ final class SessionCoordinator {
 
     // MARK: Connecting
 
-    /// Connects using the saved username + Keychain password, or asks for them.
+    /// Connects using the Keychain password (and saved username, if any), or asks for them.
     func connect(_ host: Host) {
         retryAttempt = 0
         startConnect(host, given: nil)
@@ -79,7 +79,7 @@ final class SessionCoordinator {
         startConnect(host, given: credentials)
     }
 
-    /// Sets (or clears, with nil) the active Mac's scroll speed: applies now and is remembered.
+    /// Sets (or clears, with nil) the active PC's scroll speed: applies now and is remembered.
     func setScrollSpeed(_ speed: Double?) {
         active?.scrollSpeedOverride = speed
         guard var host = activeHost.flatMap({ store.host(withID: $0.id) }) else { return }
@@ -113,7 +113,8 @@ final class SessionCoordinator {
             let route = await Tailnet.route(to: host.hostname, port: host.port)
             guard !Task.isCancelled else { return }
             var resolved = given
-            if resolved == nil, !host.username.isEmpty {
+            // A VNC password needs no username, so the saved password is looked up either way.
+            if resolved == nil {
                 let saved = try? await store.keychain.password(forHostID: host.id)
                 if let password = saved ?? nil, !password.isEmpty {
                     resolved = Credentials(username: host.username, password: password)
@@ -282,7 +283,7 @@ final class SessionCoordinator {
     }
 
     /// Opens a demo session: a built-in test pattern, no network. Lets anyone try the controls
-    /// before setting up a Mac.
+    /// before setting up a PC.
     func openDemo() {
         activeHost = Host(name: "Demo", hostname: "demo", username: "")
         active = .demo()

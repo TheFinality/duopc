@@ -2,10 +2,10 @@ import UIKit
 import IOSurface
 import CoreVideo
 
-/// A generated 2880×1800 "desktop" in an IOSurface, for the demo session (layout checks,
+/// A generated 2560×1440 "desktop" in an IOSurface, for the demo session (layout checks,
 /// screenshots) — exercises the same zero-copy render path as a real connection.
 enum DemoFramebuffer {
-    static func make(width: Int = 2880, height: Int = 1800) -> SurfaceBox? {
+    static func make(width: Int = 2560, height: Int = 1440) -> SurfaceBox? {
         guard let surface = IOSurface(properties: [
             .width: width, .height: height, .bytesPerElement: 4, .bytesPerRow: width * 4,
             .pixelFormat: kCVPixelFormatType_32BGRA,
@@ -35,12 +35,15 @@ enum DemoFramebuffer {
         grid.lineWidth = 2
         grid.stroke()
 
-        // Menu bar + dock, like a Mac.
-        UIColor.black.withAlphaComponent(0.35).setFill()
-        UIBezierPath(rect: CGRect(x: 0, y: 0, width: w, height: 48)).fill()
-        UIBezierPath(roundedRect: CGRect(x: w / 2 - 700, y: h - 150, width: 1400, height: 130), cornerRadius: 40).fill()
-        let menu: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 28, weight: .semibold), .foregroundColor: UIColor.white]
-        ("  Finder    File    Edit    View    Go    Window    Help" as NSString).draw(at: CGPoint(x: 20, y: 6), withAttributes: menu)
+        // A taskbar with centred icons and a clock, like Windows 11.
+        UIColor.black.withAlphaComponent(0.45).setFill()
+        UIBezierPath(rect: CGRect(x: 0, y: h - 72, width: w, height: 72)).fill()
+        for i in 0..<7 {
+            UIColor.white.withAlphaComponent(i == 0 ? 0.9 : 0.55).setFill()
+            UIBezierPath(roundedRect: CGRect(x: w / 2 - 280 + CGFloat(i) * 80, y: h - 58, width: 44, height: 44), cornerRadius: 10).fill()
+        }
+        let clock: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 24, weight: .medium), .foregroundColor: UIColor.white]
+        ("12:00" as NSString).draw(at: CGPoint(x: w - 110, y: h - 52), withAttributes: clock)
 
         // A window with text at a realistic size.
         UIColor.systemBackground.resolvedColor(with: .init(userInterfaceStyle: .light)).setFill()
@@ -48,7 +51,7 @@ enum DemoFramebuffer {
         let title: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 64, weight: .bold), .foregroundColor: UIColor.black]
         let body: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 26), .foregroundColor: UIColor.darkGray]
         ("\(AppInfo.name) demo" as NSString).draw(at: CGPoint(x: 360, y: 320), withAttributes: title)
-        ("2880 × 1800 test pattern · no network · grid every 100 px\nThe quick brown fox jumps over the lazy dog. 0123456789" as NSString)
+        ("2560 × 1440 test pattern · no network · grid every 100 px\nThe quick brown fox jumps over the lazy dog. 0123456789" as NSString)
             .draw(in: CGRect(x: 360, y: 430, width: 1380, height: 200), withAttributes: body)
         for (i, c) in [UIColor.systemRed, .systemOrange, .systemYellow, .systemGreen, .systemBlue, .systemPurple].enumerated() {
             c.setFill()

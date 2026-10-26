@@ -43,7 +43,7 @@ struct DuoRemoteApp: App {
 }
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
-    /// Only the system keyboard: a third-party one could see what's typed into the Mac,
+    /// Only the system keyboard: a third-party one could see what's typed into the PC,
     /// passwords included.
     func application(_ application: UIApplication,
                      shouldAllowExtensionPointIdentifier extensionPointIdentifier: UIApplication.ExtensionPointIdentifier) -> Bool {

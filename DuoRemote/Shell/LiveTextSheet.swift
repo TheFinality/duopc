@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 import VisionKit
 
-/// Mac → iPhone copy without the Mac's help: a snapshot of what's on screen, with iOS Live Text
+/// PC → iPhone copy without the PC's help: a snapshot of what's on screen, with iOS Live Text
 /// so you can select text natively (or copy all of it). Recognition runs on the phone.
 struct LiveTextSheet: View {
     let image: UIImage
@@ -74,7 +74,7 @@ struct LiveTextSheet: View {
                 } else if found == nil {
                     Label("Finding text…", systemImage: "text.viewfinder")
                 } else if found == false {
-                    Label("No text found. Zoom in on the Mac first, then try again.", systemImage: "eye.slash")
+                    Label("No text found. Zoom in on the PC first, then try again.", systemImage: "eye.slash")
                 } else {
                     Label("Text found: touch and hold to select", systemImage: "checkmark.circle")
                 }
@@ -110,16 +110,16 @@ struct CopyTextIntro: View {
                     .font(.system(size: 44, weight: .medium))
                     .foregroundStyle(.tint)
                     .padding(.top, 8)
-                wrapped(Text("Copy text from your Mac's screen").font(.title2.bold()))
-                wrapped(Text("macOS doesn't share its clipboard with other screen-sharing apps, so instead this takes a picture of what's on your Mac's screen and lets you pick out the text, using Live Text on your \(AppInfo.device).")
+                wrapped(Text("Copy text from your PC's screen").font(.title2.bold()))
+                wrapped(Text("Text you copy on the PC (Ctrl+C) already comes to your \(AppInfo.device) for 10 minutes. For text you can't select there, like in images, dialogs or error messages, this takes a picture of what's on your PC's screen and lets you pick out the text, using Live Text on your \(AppInfo.device).")
                     .foregroundStyle(.secondary))
                 VStack(alignment: .leading, spacing: 12) {
-                    row("camera.viewfinder", "Takes a snapshot of the part of the Mac's screen you can see now.")
+                    row("camera.viewfinder", "Takes a snapshot of the part of the PC's screen you can see now.")
                     row("hand.point.up.left", "Touch and hold to select text, or copy all of it.")
                     row("doc.on.clipboard", "Then paste it anywhere on your \(AppInfo.device).")
                     row("lock.shield", "Everything happens on your \(AppInfo.device). Nothing is sent anywhere.")
                 }
-                wrapped(Text("Tip: zoom in on the Mac first if the text is small.")
+                wrapped(Text("Tip: zoom in on the PC first if the text is small.")
                     .font(.footnote).foregroundStyle(.secondary))
             }
             .frame(maxWidth: 560, alignment: .leading)

@@ -5,8 +5,9 @@ Read this before changing code. It's for AI coding agents (Claude Code, Codex, C
 
 ## What this is
 
-DuoRemote: an iOS/iPadOS VNC client for macOS Screen Sharing, built for iPhone Duo (laptop pose, the fold) as well as
-iPhone and iPad. Swift 6, SwiftUI with UIKit where needed, Metal for the remote screen. No third-party SDKs.
+DuoPC (a fork of DuoRemote): an iOS/iPadOS VNC client for Windows PCs running a VNC server (TightVNC 2.8, set up by
+`windows/Setup-DuoPC.ps1`), built for iPhone Duo (laptop pose, the fold) as well as iPhone and iPad. The Xcode project
+and target keep the DuoRemote name. Swift 6, SwiftUI with UIKit where needed, Metal for the remote screen. No third-party SDKs.
 
 ## Build and test
 
@@ -24,12 +25,13 @@ the simulator. Never commit a team ID, a bundle ID or `Config/Local.xcconfig`.
 |---|---|
 | `DuoRemote/Session/` | The connection (`VNCSession`), key mapping, sticky modifiers, the Tailscale/credential policy |
 | `DuoRemote/Remote/` | The remote screen: Metal renderer, viewport maths, touch interpreter, mouse/trackpad input |
-| `DuoRemote/Hosts/` | Saved Macs, Keychain, reachability, the session coordinator |
+| `DuoRemote/Hosts/` | Saved PCs, Keychain, reachability, the session coordinator |
 | `DuoRemote/Keys/` | Key bar, keyboard capture, hardware key mapping |
 | `DuoRemote/Shell/` | Screens and layout, including iPhone Duo laptop pose |
 | `DuoRemote/Theme/` | The sky palette and deck effects |
 | `DuoRemoteTests/` | Swift Testing tests for the pure logic |
 | `Vendor/RoyalVNCKit/` | Vendored, patched RoyalVNCKit 1.1.0 |
+| `windows/` | `Setup-DuoPC.ps1`: installs and locks down TightVNC on the PC (Windows PowerShell 5.1) |
 
 ## Rules
 
@@ -49,7 +51,7 @@ the simulator. Never commit a team ID, a bundle ID or `Config/Local.xcconfig`.
   connects to the address it checked. Every connect, retry and reconnect goes through that check.
 - Passwords live only in the Keychain (`WhenUnlockedThisDeviceOnly`). Never log passwords, typed text, clipboard
   contents or screen contents; log counts at most.
-- Clipboard writes are local-only and expire. Paste to Mac never presses Return and confirms long or multi-line text.
+- Clipboard writes are local-only and expire. Paste to PC never presses Return and confirms long or multi-line text.
 - The privacy cover hides the app in the app switcher. Debug-only code stays behind `#if DEBUG`.
 - No analytics, accounts, servers or third-party SDKs.
 

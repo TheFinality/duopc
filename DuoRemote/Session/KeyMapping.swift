@@ -21,7 +21,7 @@ enum KeyMapping {
         return String(out)
     }
 
-    /// What Paste to Mac types: one entry per line, with leading and trailing line breaks dropped.
+    /// What Paste to PC types: one entry per line, with leading and trailing line breaks dropped.
     static func pasteLines(_ text: String) -> [String] {
         let trimmed = normalizingLineBreaks(text).trimmingCharacters(in: .newlines)
         return trimmed.isEmpty ? [] : trimmed.components(separatedBy: "\n")
@@ -47,6 +47,47 @@ enum KeyMapping {
             case 0..<0x20, 0x7F...0x9F: return nil                        // control characters
             default: return VNCKeyCode(0x0100_0000 | v)                   // X11 Unicode keysym
             }
+        }
+    }
+}
+
+/// Windows shortcuts that are awkward (or, like Ctrl+Alt+Del, impossible) to type on the phone.
+enum WindowsShortcut: CaseIterable, Identifiable {
+    case ctrlAltDel, taskManager, start, taskView, showDesktop, fileExplorer
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .ctrlAltDel: "Ctrl+Alt+Del"
+        case .taskManager: "Task Manager"
+        case .start: "Start menu"
+        case .taskView: "Task view"
+        case .showDesktop: "Show desktop"
+        case .fileExplorer: "File Explorer"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .ctrlAltDel: "lock.shield"
+        case .taskManager: "chart.bar.xaxis"
+        case .start: "square.grid.2x2"
+        case .taskView: "rectangle.stack"
+        case .showDesktop: "rectangle.dashed"
+        case .fileExplorer: "folder"
+        }
+    }
+
+    /// Pressed in this order and released in reverse.
+    var keys: [VNCKeyCode] {
+        switch self {
+        case .ctrlAltDel: [.control, .option, .forwardDelete]
+        case .taskManager: [.control, .shift, .escape]
+        case .start: [.command]
+        case .taskView: [.command, .tab]
+        case .showDesktop: [.command, VNCKeyCode(asciiCharacter: UInt8(ascii: "d"))]
+        case .fileExplorer: [.command, VNCKeyCode(asciiCharacter: UInt8(ascii: "e"))]
         }
     }
 }

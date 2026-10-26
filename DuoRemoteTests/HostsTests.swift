@@ -62,7 +62,7 @@ struct HostsTests {
         let host = try JSONDecoder().decode(Host.self, from: Data(json.utf8))
         #expect(host.name == "Mini" && host.port == 5901 && host.username == "me")
         #expect(host.symbol == nil && host.lastConnected == nil)
-        #expect(host.symbolName == "desktopcomputer")
+        #expect(host.symbolName == "pc")
         #expect(host.allowOutsideTailscale == false)
     }
 
@@ -74,7 +74,7 @@ struct HostsTests {
     }
 
     @Test func newFieldsRoundTrip() throws {
-        let host = Host(name: "A", hostname: "a", username: "u", symbol: "macmini",
+        let host = Host(name: "A", hostname: "a", username: "u", symbol: "laptopcomputer",
                         lastConnected: Date(timeIntervalSince1970: 100))
         let back = try JSONDecoder().decode(Host.self, from: JSONEncoder().encode(host))
         #expect(back == host)

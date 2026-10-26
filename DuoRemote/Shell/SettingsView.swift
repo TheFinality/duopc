@@ -45,7 +45,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading) {
                         Text("Default scroll speed: \(scrollSpeed, format: .number.precision(.fractionLength(1)))×")
                         Slider(value: $scrollSpeed, in: 1...5, step: 0.25)
-                        Text("Used for new connections. Each Mac can have its own speed: ••• → Scroll speed while connected.")
+                        Text("Used for new connections. Each PC can have its own speed: ••• → Scroll speed while connected.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     Toggle("Open the text box when you click into text", isOn: $autoCompose)
@@ -57,7 +57,7 @@ struct SettingsView: View {
 
                 Section("Privacy") {
                     Label("Passwords stay in this \(AppInfo.device)'s Keychain.", systemImage: "key.fill")
-                    Label("Connections go straight to your Macs.", systemImage: "arrow.left.arrow.right")
+                    Label("Connections go straight to your PCs.", systemImage: "arrow.left.arrow.right")
                     Label("No accounts, no analytics and no servers.", systemImage: "hand.raised.fill")
                 }
 

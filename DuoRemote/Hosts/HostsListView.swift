@@ -2,7 +2,7 @@
 import SwiftUI
 import os
 
-/// The home screen: a hero header, one card per saved Mac, and a Help row.
+/// The home screen: a hero header, one card per saved PC, and a Help row.
 /// Tap a card to connect; the ••• menu (or a long-press) edits or deletes.
 struct HostsListView: View {
     let coordinator: SessionCoordinator
@@ -89,7 +89,7 @@ struct HostsListView: View {
             }
             .onAppear { if !hasSeenWelcome { showWelcome = true } }
             .confirmationDialog(
-                "Delete this Mac?",
+                "Delete this PC?",
                 isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
                 titleVisibility: .visible,
                 presenting: pendingDelete
@@ -162,7 +162,7 @@ private struct HeroHeader: View {
                                                     startPoint: .leading, endPoint: .trailing))
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
-                Text("Your Macs, always within reach.")
+                Text("Your PCs, always within reach.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -185,7 +185,7 @@ private struct HeroHeader: View {
                     .labelStyle(.iconOnly)
                     .buttonStyle(.glass)
                     .buttonBorderShape(.circle)
-                Button("Add Mac", systemImage: "plus", action: onAdd)
+                Button("Add PC", systemImage: "plus", action: onAdd)
                     .labelStyle(.iconOnly)
                     .buttonStyle(.glassProminent)
                     .buttonBorderShape(.circle)
@@ -202,11 +202,11 @@ extension Host {
     /// Accent gradient for the host's icon tile.
     var tintColors: [Color] {
         switch symbolName {
-        case "macmini": [.indigo, .purple]
         case "laptopcomputer": [.teal, .blue]
-        case "macstudio": [.pink, .indigo]
+        case "desktopcomputer": [.pink, .indigo]
         case "display": [.green, .teal]
-        default: [.orange, .pink]
+        case "server.rack": [.indigo, .purple]
+        default: [.blue, .cyan]
         }
     }
 }
@@ -371,7 +371,7 @@ private struct HostCard: View {
             .buttonStyle(PressStyle())
             .sensoryFeedback(.impact(weight: .light), trigger: taps)
             .accessibilityLabel("\(host.name), \(subtitle)")
-            .accessibilityHint("Connects to this Mac")
+            .accessibilityHint("Connects to this PC")
 
             Menu {
                 Button("Connect", systemImage: "play.fill", action: onConnect)
@@ -404,7 +404,7 @@ private struct AddMacCard: View {
             HStack(spacing: 12) {
                 Image(systemName: "plus")
                     .font(.title3.weight(.semibold))
-                Text("Add a Mac").font(.headline)
+                Text("Add a PC").font(.headline)
             }
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, minHeight: 88)
@@ -423,12 +423,12 @@ private struct AddMacCard: View {
 private struct GettingStartedSteps: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            step(1, "Turn on Screen Sharing",
-                 "On your Mac, open System Settings → General → Sharing and switch on Screen Sharing.")
+            step(1, "Set up your PC",
+                 "On your PC, run Setup-DuoPC.ps1 from this app's repo. It installs the free TightVNC server, sets its password and lets in only your Tailscale devices.")
             step(2, "Connect the two",
-                 "Put your \(AppInfo.device) and Mac on the same network, or install [Tailscale](https://tailscale.com) on both to connect from anywhere. With Tailscale, turn on MagicDNS and use your Mac's name.")
-            step(3, "Add your Mac",
-                 "Add your Mac here and sign in with your Mac's username and password.")
+                 "Install [Tailscale](https://tailscale.com) on your \(AppInfo.device) and PC, signed in to the same account. Turn on MagicDNS and use your PC's name.")
+            step(3, "Add your PC",
+                 "Add your PC here and sign in with the VNC password you chose.")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -476,16 +476,16 @@ private struct OnboardingCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            SymbolTile(symbol: "macbook.and.iphone", colors: [.indigo, .cyan], size: 64)
+            SymbolTile(symbol: "pc", colors: [.indigo, .cyan], size: 64)
             VStack(alignment: .leading, spacing: 6) {
                 Text("Get started").font(.title2.bold())
-                Text("Three steps and your Mac is on your \(AppInfo.device).")
+                Text("Three steps and your PC is on your \(AppInfo.device).")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
             GettingStartedSteps()
             Button(action: onAdd) {
-                Text("Add your first Mac")
+                Text("Add your first PC")
                     .font(.headline)
                     .frame(maxWidth: .infinity, minHeight: 28)
             }
@@ -546,7 +546,7 @@ struct HostEditor: View {
         _name = State(initialValue: host?.name ?? "")
         _hostname = State(initialValue: host?.hostname ?? "")
         _portText = State(initialValue: String(host?.port ?? 5900))
-        // A new Mac usually shares your username; the password is always per Mac.
+        // A new PC usually shares your Windows username; the password is always per PC.
         let lastUsername = store.hosts.max { ($0.lastConnected ?? .distantPast) < ($1.lastConnected ?? .distantPast) }?.username ?? ""
         _username = State(initialValue: host?.username ?? lastUsername)
         _symbol = State(initialValue: host?.symbolName ?? HostSymbol.defaultName)
@@ -560,11 +560,11 @@ struct HostEditor: View {
     }
 
     private var nameError: String? {
-        name.trimmingCharacters(in: .whitespaces).isEmpty ? "Give this Mac a name." : nil
+        name.trimmingCharacters(in: .whitespaces).isEmpty ? "Give this PC a name." : nil
     }
 
     private var hostnameError: String? {
-        hostname.trimmingCharacters(in: .whitespaces).isEmpty ? "Enter the Mac's name or IP address." : nil
+        hostname.trimmingCharacters(in: .whitespaces).isEmpty ? "Enter the PC's name or IP address." : nil
     }
 
     private var credentialError: String? {
@@ -578,13 +578,13 @@ struct HostEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Mac") {
+                Section("PC") {
                     TextField("Name", text: $name)
                     if showErrors, let nameError { ErrorText(nameError) }
                     SymbolPicker(selection: $symbol)
                 }
                 Section("Connection") {
-                    TextField("Hostname", text: $hostname, prompt: Text("my-mac or 100.x.x.x"))
+                    TextField("Hostname", text: $hostname, prompt: Text("my-pc or 100.x.x.x"))
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
@@ -597,25 +597,25 @@ struct HostEditor: View {
                     if showErrors, let portError { ErrorText(portError) }
                 }
                 Section {
-                    TextField("Username", text: $username)
+                    SecureField("VNC password", text: $password)
                         .textContentType(nil)   // not a website login: keep iOS Passwords from offering to save/update it
+                    TextField("Windows username (optional)", text: $username)
+                        .textContentType(nil)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                    SecureField("Password", text: $password)
-                        .textContentType(nil)
                     if let credentialError { ErrorText(credentialError) }
                 } header: {
                     Text("Sign-in")
                 } footer: {
-                    Text("With Tailscale, use the Mac's MagicDNS name (for example my-mac). Turn on MagicDNS in the Tailscale admin console under DNS. An IP address works too. Your password is stored in this \(AppInfo.device)'s Keychain.")
+                    Text("With Tailscale, use the PC's MagicDNS name (for example my-pc). Turn on MagicDNS in the Tailscale admin console under DNS. An IP address works too. Your password is stored in this \(AppInfo.device)'s Keychain. Leave the username empty unless your PC runs UltraVNC with Windows sign-in.")
                 }
                 Section {
                     Toggle("Allow outside Tailscale", isOn: $allowOutside)
                 } footer: {
-                    Text("Normally your saved password is sent only when this Mac is reached through Tailscale, and only to a macOS sign-in. Turn this on to also send it over other networks, or to a Mac that asks for a plain VNC password. On a network you don't trust, a fake server could capture your Mac's password.")
+                    Text("Normally your saved password is sent only when this PC is reached through Tailscale. Turn this on to also send it over other networks, or to a PC that asks for no sign-in at all. VNC doesn't encrypt your screen or keystrokes, and on a network you don't trust a fake server could capture your password.")
                 }
             }
-            .navigationTitle(host == nil ? "New Mac" : "Edit Mac")
+            .navigationTitle(host == nil ? "New PC" : "Edit PC")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

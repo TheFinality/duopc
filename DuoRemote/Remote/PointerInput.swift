@@ -20,7 +20,7 @@ extension RemoteCanvasView: UIPointerInteractionDelegate {
         addInteraction(UIPointerInteraction(delegate: self))
     }
 
-    /// Only the Mac's cursor shows over the remote screen.
+    /// Only the PC's cursor shows over the remote screen.
     func pointerInteraction(_ interaction: UIPointerInteraction, styleFor region: UIPointerRegion) -> UIPointerStyle? {
         .hidden()
     }

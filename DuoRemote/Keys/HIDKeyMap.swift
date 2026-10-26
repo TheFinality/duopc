@@ -2,7 +2,8 @@
 import UIKit
 
 /// Hardware keyboard (USB HID usage, as UIKit reports it) → VNC key. Letters and punctuation map to
-/// their unshifted keysyms; Shift travels as its own modifier key and macOS applies it.
+/// their unshifted keysyms; Shift travels as its own modifier key and Windows applies it.
+/// ⌘ (the GUI key) is the Windows key, as on a PC keyboard and in Boot Camp; ⌥ is Alt.
 enum HIDKeyMap {
     static func key(for usage: UIKeyboardHIDUsage) -> VNCKeyCode? {
         key(forUsageRawValue: usage.rawValue)

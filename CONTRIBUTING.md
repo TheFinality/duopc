@@ -5,7 +5,7 @@ Thanks for taking a look. This started as a personal app, so support is best-eff
 ## Before you start
 
 - For anything bigger than a small fix, open an issue first so we can agree on the approach.
-- Bugs: include your iPhone model (and Duo pose, if relevant), iOS version, macOS version, and steps to reproduce. **Connection log** (••• → Connection log) helps; check it doesn't contain anything private before you paste it.
+- Bugs: include your iPhone model (and Duo pose, if relevant), iOS version, Windows version, VNC server and version, and steps to reproduce. **Connection log** (••• → Connection log) helps; check it doesn't contain anything private before you paste it.
 - Security problems: please don't open a public issue. See [SECURITY.md](SECURITY.md).
 
 ## Building and testing

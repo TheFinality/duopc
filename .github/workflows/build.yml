@@ -1,0 +1,47 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # The project needs Xcode 27 (iOS 27.1 SDK): use the newest Xcode on the runner.
+      - name: Select the newest Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)
+          sudo xcode-select -s "$latest/Contents/Developer"
+          xcodebuild -version
+
+      - name: Build (simulator, no signing)
+        run: |
+          xcodebuild build -project DuoRemote.xcodeproj -scheme DuoRemote \
+            -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO
+
+      - name: Test
+        run: |
+          sim=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          names = [d["name"] for runtime, ds in devices.items() if "iOS" in runtime for d in ds if d["name"].startswith("iPhone")]
+          print(names[-1])')
+          xcodebuild test -project DuoRemote.xcodeproj -scheme DuoRemote \
+            -destination "platform=iOS Simulator,name=$sim" CODE_SIGNING_ALLOWED=NO
+
+  windows-script:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse Setup-DuoPC.ps1
+        shell: powershell
+        run: |
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile("$PWD\windows\Setup-DuoPC.ps1", [ref]$null, [ref]$errors)
+          if ($errors) { $errors | ForEach-Object { Write-Error $_.ToString() }; exit 1 }
+          'parsed ok'

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A real iOS text field above the key bar: dictation, autocorrect, emoji, editing.
-/// The keyboard's Return key types the text into the Mac and presses Return; the ↑ button types
+/// The keyboard's Return key types the text into the PC and presses Return; the ↑ button types
 /// it without Return. Either way the box clears. The lock switches to hidden entry for passwords.
 struct ComposeBox: View {
     let session: VNCSession

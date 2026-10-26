@@ -1,7 +1,7 @@
 @preconcurrency import RoyalVNCKit
 import SwiftUI
 
-/// ⌘ ⌥ ⌃ ⇧ (sticky), Esc, Tab, arrows, keyboard toggle, plus a trailing accessory slot.
+/// Ctrl ⊞ Alt ⇧ (sticky), Esc, Tab, arrows, keyboard toggle, plus a trailing accessory slot.
 /// The modifier and navigation groups are separate views so the shell can split them (e.g. around a fold).
 struct KeyBar<Accessory: View>: View {
     let session: VNCSession
@@ -70,7 +70,7 @@ struct KeyBar<Accessory: View>: View {
 
 // MARK: - Groups
 
-/// ⌘ ⌥ ⌃ ⇧. Tap = latch; double-tap = lock; tap again = off.
+/// Ctrl ⊞ Alt ⇧. Tap = latch; double-tap = lock; tap again = off.
 struct KeyBarModifierKeys: View {
     let session: VNCSession
     @State private var haptic = 0
@@ -83,7 +83,7 @@ struct KeyBarModifierKeys: View {
                     haptic += 1
                     session.modifiers.keyTapped(modifier)
                 } label: {
-                    KeyCap(label: Text(modifier.glyph), state: mode == .locked ? .locked : mode == .latched ? .latched : .off, accent: .key)
+                    KeyCap(label: Text(modifier.glyph).font(modifier.isWord ? Font.callout.weight(.medium) : Font.title3), state: mode == .locked ? .locked : mode == .latched ? .latched : .off, accent: .key)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(modifier.name)

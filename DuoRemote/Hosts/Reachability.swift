@@ -2,7 +2,7 @@ import Foundation
 import Network
 import Observation
 
-/// Checks whether a Mac accepts TCP connections. Behind a protocol so tests can stub it.
+/// Checks whether a PC accepts TCP connections. Behind a protocol so tests can stub it.
 nonisolated protocol ReachabilityProbe: Sendable {
     func isReachable(hostname: String, port: UInt16) async -> Bool
 }

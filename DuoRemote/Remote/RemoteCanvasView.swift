@@ -154,7 +154,7 @@ final class RemoteCanvasView: UIView, SessionDisplay {
         let animating = stepEffects(now: CACurrentMediaTime(), dt: dt)
         if animating { needsRender = true }
 
-        // 120 Hz while the user is interacting, 60 Hz while the Mac's screen or an effect is
+        // 120 Hz while the user is interacting, 60 Hz while the PC's screen or an effect is
         // changing, and 30 Hz when nothing is happening (a touch brings it straight back up).
         let wanted: Float = now - lastActivity < 1 ? 120 : (now - lastScreenChange < 1 || animating) ? 60 : 30
         if link.preferredFrameRateRange.preferred != wanted {
@@ -274,7 +274,7 @@ final class RemoteCanvasView: UIView, SessionDisplay {
             cursorImage = c.image
             cursorHotspot = c.hotspot
         } else {
-            // No shape from the Mac yet (or an empty one): show our arrow rather than nothing.
+            // No shape from the PC yet (or an empty one): show our arrow rather than nothing.
             cursorImage = Self.defaultArrow
             cursorHotspot = CGPoint(x: 2, y: 2)
         }

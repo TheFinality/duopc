@@ -7,24 +7,28 @@ enum InputMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// A PC keyboard's modifiers, in its left-to-right order.
 enum Modifier: CaseIterable, Hashable {
-    case command, option, control, shift
+    case control, windows, alt, shift
 
     var keyCode: VNCKeyCode {
         switch self {
-        case .command: .command
-        case .option: .option
         case .control: .control
+        case .windows: .command     // XK_Super_L, which Windows VNC servers press as the Windows key
+        case .alt: .option          // XK_Alt_L
         case .shift: .shift
         }
     }
 
     var glyph: String {
-        switch self { case .command: "⌘"; case .option: "⌥"; case .control: "⌃"; case .shift: "⇧" }
+        switch self { case .control: "ctrl"; case .windows: "⊞"; case .alt: "alt"; case .shift: "⇧" }
     }
 
+    /// Spelled out (ctrl, alt) rather than a symbol, so it's set smaller to fit the key.
+    var isWord: Bool { self == .control || self == .alt }
+
     var name: String {
-        switch self { case .command: "Command"; case .option: "Option"; case .control: "Control"; case .shift: "Shift" }
+        switch self { case .control: "Control"; case .windows: "Windows"; case .alt: "Alt"; case .shift: "Shift" }
     }
 }
 

@@ -36,4 +36,11 @@ struct KeyMappingTests {
         #expect(!KeyMapping.pasteNeedsConfirmation([String(repeating: "x", count: 2_000)]))
         #expect(KeyMapping.pasteNeedsConfirmation([String(repeating: "x", count: 2_001)]))
     }
+
+    @Test func windowsShortcutsHoldWindowsKeys() {
+        #expect(WindowsShortcut.ctrlAltDel.keys == [VNCKeyCode.control, VNCKeyCode.option, VNCKeyCode.forwardDelete])
+        #expect(WindowsShortcut.taskManager.keys == [VNCKeyCode.control, VNCKeyCode.shift, VNCKeyCode.escape])
+        #expect(WindowsShortcut.showDesktop.keys == [VNCKeyCode.command, VNCKeyCode(asciiCharacter: UInt8(ascii: "d"))])
+        #expect(WindowsShortcut.allCases.allSatisfy { !$0.keys.isEmpty })
+    }
 }

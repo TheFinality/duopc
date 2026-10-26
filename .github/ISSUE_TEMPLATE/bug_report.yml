@@ -14,7 +14,7 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: |
-        1. Connect to a Mac
+        1. Connect to a PC
         2. …
   - type: input
     id: iphone
@@ -31,8 +31,8 @@ body:
   - type: input
     id: macos
     attributes:
-      label: macOS version
-      placeholder: macOS 27.1
+      label: Windows and VNC server version
+      placeholder: Windows 11 24H2, TightVNC 2.8.85
   - type: textarea
     id: log
     attributes:

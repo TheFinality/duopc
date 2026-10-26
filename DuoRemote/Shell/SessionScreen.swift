@@ -74,7 +74,7 @@ struct SessionScreen: View {
     private var obscuredInsets: EdgeInsets {
         var i = safeInsets
         // The side insets are the system's vertical-bar area (e.g. the Duo's outer display).
-        // Status and bars are hidden in a session, so the Mac's screen may use that space.
+        // Status and bars are hidden in a session, so the PC's screen may use that space.
         i.leading = 0
         i.trailing = 0
         if !barCollapsed { i.bottom += barHeight }
@@ -197,7 +197,7 @@ struct SessionScreen: View {
     private static let deckMinWidth: CGFloat = 700
 
     private func laptopStack(fold f: CGRect) -> some View {
-        // Keyboard mode: the key strip sits centred on the fold (the gutter between the Mac's
+        // Keyboard mode: the key strip sits centred on the fold (the gutter between the PC's
         // screen and the keyboard) instead of taking height from the screen.
         let overhang = deckMode == .keyboard ? max((Self.stripHeight - f.height) / 2, 0) : 0
         return VStack(spacing: 0) {
@@ -256,7 +256,7 @@ private struct SessionBar: View {
         content
             .padding(.horizontal, 8)
             // The whole bar catches touches, so a tap between buttons never falls through to
-            // the canvas behind it (which would click the Mac).
+            // the canvas behind it (which would click the PC).
             .background { Color.black.opacity(0.001).padding(.vertical, -4) }
     }
 
@@ -305,7 +305,7 @@ private struct SessionBar: View {
             // Blue (filled) while the text box is open, plain while it's closed.
             .foregroundStyle(composeShown ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
             .accessibilityValue(composeShown ? "On" : "Off")
-            Button("Paste to Mac", systemImage: "doc.on.clipboard", action: session.pasteClipboard)
+            Button("Paste to PC", systemImage: "doc.on.clipboard", action: session.pasteClipboard)
                 .barButton()
                 .pasteBeamSource()
             Button("Hide keys", systemImage: "chevron.down", action: collapse)
@@ -364,7 +364,7 @@ private struct FloatingChrome: View {
     }
 
     @ViewBuilder private var status: some View {
-        // A retry first looks the Mac up again (the Tailscale check); show that as connecting too.
+        // A retry first looks the PC up again (the Tailscale check); show that as connecting too.
         let lookingUp = coordinator.activeHost.map { $0.id == coordinator.lookingUpHostID } ?? false
         switch session.status {
         case .connecting:
@@ -404,9 +404,9 @@ private struct FloatingChrome: View {
         switch f {
         case .authenticationFailed: "authentication failed"
         case .network(let m): m
-        case .closedByServer: "closed by the Mac"
-        case .outsideTailscale: "this Mac isn't reached through Tailscale, so your saved password wasn't sent"
-        case .insecureAuthentication: "this Mac didn't offer a macOS sign-in (it asked for a plain VNC password, or no sign-in at all), so the app didn't continue. To allow it, turn on Allow outside Tailscale in Edit Mac."
+        case .closedByServer: "closed by the PC"
+        case .outsideTailscale: "this PC isn't reached through Tailscale, so your saved password wasn't sent"
+        case .insecureAuthentication: "this PC didn't ask for a password (or asked for a kind of sign-in Windows VNC servers don't use), so the app didn't continue. Set a password in your VNC server, or to allow it anyway, turn on Allow outside Tailscale in Edit PC."
         }
     }
 }

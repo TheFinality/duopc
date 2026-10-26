@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 /// Covers every window of a scene whenever it isn't active, so the app switcher snapshot shows
-/// neither the Mac's screen nor any sheet above it (Copy text from screen, the hosts list).
+/// neither the PC's screen nor any sheet above it (Copy text from screen, the hosts list).
 /// A window of its own above everything; driven by UIKit's scene notifications, which arrive
 /// before the snapshot is taken.
 final class PrivacyShield: NSObject {
@@ -56,7 +56,7 @@ private struct PrivacyCover: View {
         ZStack {
             Color(red: 0.07, green: 0.07, blue: 0.10)
             VStack(spacing: 14) {
-                Image(systemName: "macbook.and.iphone")
+                Image(systemName: "pc")
                     .font(.system(size: 48, weight: .medium))
                 Text(AppInfo.name)
                     .font(.system(.title, design: .rounded, weight: .bold))

@@ -67,11 +67,16 @@ struct CredentialPolicyTests {
         #expect(CredentialPolicy.maySend(over: .unresolved, allowOutsideTailscale: true, approvedAddress: nil))
     }
 
-    @Test func onlyMacOSSignInIsAnsweredByDefault() {
-        #expect(CredentialPolicy.mayAnswer(.appleRemoteDesktop, allowOutsideTailscale: false))
-        #expect(!CredentialPolicy.mayAnswer(.vnc, allowOutsideTailscale: false))
-        #expect(!CredentialPolicy.mayAnswer(.ultraVNCMSLogonII, allowOutsideTailscale: false))
-        #expect(CredentialPolicy.mayAnswer(.vnc, allowOutsideTailscale: true))
+    @Test func onlyWindowsVNCSignInsAreAnsweredByDefault() {
+        #expect(CredentialPolicy.mayAnswer(.vnc, allowOutsideTailscale: false))
+        #expect(CredentialPolicy.mayAnswer(.ultraVNCMSLogonII, allowOutsideTailscale: false))
+        #expect(!CredentialPolicy.mayAnswer(.appleRemoteDesktop, allowOutsideTailscale: false))
+        #expect(CredentialPolicy.mayAnswer(.appleRemoteDesktop, allowOutsideTailscale: true))
+    }
+
+    @Test func passwordHintWarnsPastEightCharacters() {
+        #expect(!CredentialText.passwordHint("12345678").contains("first 8"))
+        #expect(CredentialText.passwordHint("123456789").contains("first 8"))
     }
 
     @Test func blockedFailuresDontRetry() {

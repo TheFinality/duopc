@@ -8,9 +8,9 @@ import QuartzCore
 final class InputController {
     struct Tuning {
         /// Points of finger travel per wheel click at 1× and slow speeds (fast swipes send up to
-        /// 5× more). macOS turns each VNC wheel click into only a small scroll, so this is low;
-        /// the session's scroll speed (global default or this Mac's override) divides it.
-        var baseScrollPointsPerStep: CGFloat = 4
+        /// 5× more). Windows scrolls a whole notch (3 lines) per VNC wheel click, so this is high;
+        /// the session's scroll speed (global default or this PC's override) divides it.
+        var baseScrollPointsPerStep: CGFloat = 30
         var invertScroll = UserDefaults.standard.bool(forKey: "invertScroll")
         var momentumTimeConstant: CGFloat = 0.35
         var momentumMinSpeed: CGFloat = 300    // pt/s to start momentum

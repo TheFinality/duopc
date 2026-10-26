@@ -21,24 +21,24 @@ struct KeysTests {
     }
 
     @Test func doubleTapWithinWindowLocks() {
-        let first = (modifier: Modifier.command, time: 10.0)
-        #expect(ModifierTap.decide(previous: nil, modifier: .command, now: 10.0) == .tap)
-        #expect(ModifierTap.decide(previous: first, modifier: .command, now: 10.2) == .lock)
+        let first = (modifier: Modifier.windows, time: 10.0)
+        #expect(ModifierTap.decide(previous: nil, modifier: .windows, now: 10.0) == .tap)
+        #expect(ModifierTap.decide(previous: first, modifier: .windows, now: 10.2) == .lock)
     }
 
     @Test func slowOrDifferentKeyTapsAgain() {
-        let first = (modifier: Modifier.command, time: 10.0)
-        #expect(ModifierTap.decide(previous: first, modifier: .command, now: 10.5) == .tap)
+        let first = (modifier: Modifier.windows, time: 10.0)
+        #expect(ModifierTap.decide(previous: first, modifier: .windows, now: 10.5) == .tap)
         #expect(ModifierTap.decide(previous: first, modifier: .shift, now: 10.1) == .tap)
     }
 
     @Test func modifierKeyTapsLatchLockAndRelease() {
         let m = ModifierState()
-        m.keyTapped(.command, now: 10.0)
-        #expect(m.mode(of: .command) == .latched)
-        m.keyTapped(.command, now: 10.2)
-        #expect(m.mode(of: .command) == .locked)
-        m.keyTapped(.command, now: 11.0)
-        #expect(m.mode(of: .command) == .off)
+        m.keyTapped(.windows, now: 10.0)
+        #expect(m.mode(of: .windows) == .latched)
+        m.keyTapped(.windows, now: 10.2)
+        #expect(m.mode(of: .windows) == .locked)
+        m.keyTapped(.windows, now: 11.0)
+        #expect(m.mode(of: .windows) == .off)
     }
 }

@@ -4,7 +4,7 @@ Please report security problems privately, using GitHub's **Report a vulnerabili
 
 Include what you found, how to reproduce it, and what an attacker could do with it. This is a spare-time project, so there's no bounty and response times vary, but reports are taken seriously.
 
-The app's security model (what macOS Screen Sharing does and doesn't protect, and why the app relies on Tailscale) is described under **Security** in the [README](README.md).
+The app's security model (what VNC does and doesn't protect, and why the app and `windows/Setup-DuoPC.ps1` rely on Tailscale) is described under **Security** in the [README](README.md).
 
 ## Known limitations
 

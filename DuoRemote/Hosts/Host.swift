@@ -1,19 +1,20 @@
 import Foundation
 
-/// A saved Mac. The password lives in the Keychain, never here.
+/// A saved PC. The password lives in the Keychain, never here.
 struct Host: Identifiable, Codable, Hashable {
     var id: UUID = UUID()
     var name: String
-    var hostname: String          // tailnet name, e.g. "my-mac"
+    var hostname: String          // tailnet name, e.g. "my-pc"
     var port: UInt16 = 5900
+    /// Only for a Windows-account sign-in (UltraVNC MS-Logon II); a VNC password needs none.
     var username: String
-    /// SF Symbol name; see `HostSymbol`. nil means `desktopcomputer`.
+    /// SF Symbol name; see `HostSymbol`. nil means `pc`.
     var symbol: String?
     var lastConnected: Date?
-    /// Per-Mac scroll speed; nil = use the global default (Settings).
+    /// Per-PC scroll speed; nil = use the global default (Settings).
     var scrollSpeed: Double?
-    /// Send the password even when the Mac isn't reached through Tailscale, or asks for a plain
-    /// VNC password instead of a macOS sign-in.
+    /// Send the password even when the PC isn't reached through Tailscale, or asks for a kind of
+    /// sign-in a Windows VNC server doesn't use (or none).
     var allowOutsideTailscale = false
 
     init(id: UUID = UUID(), name: String, hostname: String, port: UInt16 = 5900, username: String,
@@ -43,18 +44,18 @@ struct Host: Identifiable, Codable, Hashable {
     var symbolName: String { symbol ?? HostSymbol.defaultName }
 }
 
-/// The Mac icons offered in the editor.
+/// The PC icons offered in the editor.
 enum HostSymbol {
-    static let defaultName = "desktopcomputer"
-    static let all = ["macmini", "laptopcomputer", "desktopcomputer", "macstudio", "display"]
+    static let defaultName = "pc"
+    static let all = ["pc", "laptopcomputer", "desktopcomputer", "display", "server.rack"]
 
     static func label(_ name: String) -> String {
         switch name {
-        case "macmini": "Mac mini"
-        case "laptopcomputer": "MacBook"
-        case "macstudio": "Mac Studio"
-        case "display": "iMac or display"
-        default: "Desktop Mac"
+        case "laptopcomputer": "Laptop"
+        case "desktopcomputer": "All-in-one"
+        case "display": "Monitor"
+        case "server.rack": "Server"
+        default: "Desktop PC"
         }
     }
 }

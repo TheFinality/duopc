@@ -19,7 +19,7 @@ final class PasteBeam {
 }
 
 extension VNCSession {
-    /// Types the iPhone's clipboard on the Mac, with the beam. Reading the pasteboard shows
+    /// Types the iPhone's clipboard on the PC, with the beam. Reading the pasteboard shows
     /// iOS's own "Allow Paste" prompt. Multi-line or long text waits in `pendingPaste` for the
     /// shell to confirm.
     func pasteClipboard() {
@@ -39,7 +39,7 @@ extension VNCSession {
 
     private func sendPaste(_ text: String) {
         PasteBeam.shared.fire()
-        pasteToMac(text)
+        pasteToPC(text)
     }
 }
 

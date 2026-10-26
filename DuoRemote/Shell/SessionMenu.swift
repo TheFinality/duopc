@@ -29,6 +29,11 @@ struct SessionMenu: View {
                 Button("Zoom to fit", systemImage: "arrow.down.right.and.arrow.up.left") { session.zoomToFit() }
                 Button("Actual pixels", systemImage: "1.magnifyingglass") { session.zoomToActualPixels() }
             }
+            Menu("Windows shortcuts", systemImage: "keyboard.badge.ellipsis") {
+                ForEach(WindowsShortcut.allCases) { shortcut in
+                    Button(shortcut.title, systemImage: shortcut.systemImage) { session.send(shortcut) }
+                }
+            }
             Section {
                 Button("Copy text from screen", systemImage: "text.viewfinder") {
                     if hasSeenCopyIntro { openCopyText() } else { showCopyIntro = true }
@@ -69,7 +74,7 @@ struct SessionMenu: View {
     }
 }
 
-/// Recent connection events — e.g. to see whether the Mac sends clipboard messages at all.
+/// Recent connection events — e.g. to see whether the PC sends clipboard messages at all.
 struct ConnectionLogView: View {
     let session: VNCSession
     @Environment(\.dismiss) private var dismiss
@@ -106,7 +111,7 @@ struct LiveTextImage: Identifiable {
     let image: UIImage
 }
 
-/// This Mac's scroll speed: follow the global default, or set its own. Applies immediately.
+/// This PC's scroll speed: follow the global default, or set its own. Applies immediately.
 struct ScrollSpeedSheet: View {
     let session: VNCSession
     let coordinator: SessionCoordinator
@@ -128,7 +133,7 @@ struct ScrollSpeedSheet: View {
                         }
                     }
                 } footer: {
-                    Text("Applies straight away and is remembered for \(coordinator.activeHost?.name ?? "this Mac"). The default is in Settings on the Macs screen.")
+                    Text("Applies straight away and is remembered for \(coordinator.activeHost?.name ?? "this PC"). The default is in Settings on the PCs screen.")
                 }
             }
             .navigationTitle("Scroll speed")

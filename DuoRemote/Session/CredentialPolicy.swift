@@ -2,7 +2,7 @@
 import Darwin
 import Foundation
 
-/// How a Mac's hostname is reached, checked before a password is sent to it.
+/// How a PC's hostname is reached, checked before a password is sent to it.
 nonisolated enum TailnetRoute: Equatable, Sendable {
     /// Every address is a Tailscale address that leaves through the Tailscale tunnel. Connect to this one.
     case tailnet(String)
@@ -31,9 +31,10 @@ nonisolated enum CredentialPolicy {
         }
     }
 
-    /// Only a macOS sign-in (ARD) gets the password, unless the host allows other kinds.
+    /// Windows VNC servers sign in with a VNC password (TightVNC, UltraVNC, TigerVNC) or a Windows
+    /// account (UltraVNC MS-Logon II). Anything else gets the password only if the host allows it.
     static func mayAnswer(_ type: VNCAuthenticationType, allowOutsideTailscale: Bool) -> Bool {
-        type == .appleRemoteDesktop || allowOutsideTailscale
+        type == .vnc || type == .ultraVNCMSLogonII || allowOutsideTailscale
     }
 }
 

@@ -43,13 +43,13 @@ final class HostStore {
         let id = host.id
         Task {
             do { try await keychain.deletePassword(forHostID: id) } catch {
-                Logger.keychain.error("Couldn't delete a removed Mac's password: \(String(describing: error), privacy: .public)")
+                Logger.keychain.error("Couldn't delete a removed PC's password: \(String(describing: error), privacy: .public)")
             }
         }
     }
 
     /// At launch: the Keychain outlives the app, so after a fresh install (no saved hosts, no flag)
-    /// wipe what an earlier install left; otherwise drop passwords whose Mac is gone.
+    /// wipe what an earlier install left; otherwise drop passwords whose PC is gone.
     func tidyKeychain(defaults: UserDefaults = .standard) async {
         let flag = "keychainInitialised"
         let freshInstall = !defaults.bool(forKey: flag) && !FileManager.default.fileExists(atPath: fileURL.path)

@@ -4,7 +4,7 @@ import UIKit
 
 enum DeckMode: String { case trackpad, keyboard }
 
-/// Laptop pose (Duo half-open, fold horizontal): the Mac screen on the top half, this deck on
+/// Laptop pose (Duo half-open, fold horizontal): the PC screen on the top half, this deck on
 /// the bottom. Trackpad mode: modifiers | trackpad + click buttons | Esc/Tab/arrows.
 /// Keyboard mode: a key row, with the system keyboard filling the rest of the deck.
 struct LaptopDeck: View {
@@ -55,7 +55,7 @@ struct LaptopDeck: View {
         HStack(spacing: 8) {
             GlassEffectContainer(spacing: 8) {
                 HStack(spacing: 8) {
-                    DeckIconButton(systemImage: "doc.on.clipboard", label: "Paste to Mac", action: session.pasteClipboard)
+                    DeckIconButton(systemImage: "doc.on.clipboard", label: "Paste to PC", action: session.pasteClipboard)
                         .pasteBeamSource()
                     DeckIconButton(systemImage: composeShown ? "text.bubble.fill" : "text.bubble", label: "Text box",
                                    on: composeShown) {
@@ -312,14 +312,14 @@ private struct DeckKey<Label: View>: View {
     }
 }
 
-/// ⌘ ⌥ ⌃ ⇧ — tap to latch, double-tap to lock, tap again to release. Lit when active.
+/// Ctrl ⊞ Alt ⇧ — tap to latch, double-tap to lock, tap again to release. Lit when active.
 private struct DeckModifierKey: View {
     let session: VNCSession
     let modifier: Modifier
 
     var body: some View {
         let state = session.modifiers.mode(of: modifier)
-        DeckKey(label: Text(modifier.glyph).font(.title2), tint: state == .off ? nil : SkyTheme.shared.keyAccent.opacity(0.35),
+        DeckKey(label: Text(modifier.glyph).font(modifier.isWord ? Font.callout.weight(.medium) : Font.title2), tint: state == .off ? nil : SkyTheme.shared.keyAccent.opacity(0.35),
                 accent: .key, glow: state) {
             session.modifiers.keyTapped(modifier)
         }
