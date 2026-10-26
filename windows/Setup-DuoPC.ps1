@@ -86,9 +86,17 @@ function Get-TightVncInstall {
         Select-Object -First 1
 }
 
-# The IPv4 address on the interface with a default gateway: what the router forwards to.
+# A plugged-in iPhone or iPad shows up as a network adapter with its own route to the internet
+# (USB tethering), so lookups can go out through the phone's mobile data instead of home.
+function Get-PhoneTetherAdapters {
+    @(Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' -and $_.InterfaceDescription -match 'Apple Mobile Device|iPhone|iPad' })
+}
+
+# The IPv4 address on the home network interface with a default gateway: what the router forwards to.
 function Get-LanAddress {
-    $route = Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Sort-Object RouteMetric | Select-Object -First 1
+    $phones = @(Get-PhoneTetherAdapters | ForEach-Object { $_.ifIndex })
+    $route = Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue |
+        Where-Object { $_.ifIndex -notin $phones } | Sort-Object { $_.RouteMetric + $_.InterfaceMetric } | Select-Object -First 1
     if (-not $route) { return $null }
     Get-NetIPAddress -InterfaceIndex $route.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
         Where-Object { $_.IPAddress -notlike '169.254.*' } | Select-Object -First 1 -ExpandProperty IPAddress
@@ -328,6 +336,14 @@ function Resolve-PublicHost {
     Write-Host '    or your public IP. Press Enter to look up your current public IP (asks api.ipify.org).'
     $answer = (Read-Host '    Address').Trim()
     if ($answer) { return $answer }
+    if (Get-PhoneTetherAdapters) {
+        Write-Warn 'An iPhone or iPad is plugged in and sharing its mobile data with this PC, so the lookup'
+        Write-Warn 'could return the phone''s address instead of your home''s. Unplug it (or turn off its'
+        Write-Warn 'Personal Hotspot) and press Enter, or type your home''s address.'
+        $answer = (Read-Host '    Address').Trim()
+        if ($answer) { return $answer }
+        if (Get-PhoneTetherAdapters) { throw 'The phone is still sharing its connection; unplug it and run this again with -Pair.' }
+    }
     try {
         $ip = (Invoke-RestMethod -Uri 'https://api.ipify.org' -UseBasicParsing -TimeoutSec 10).ToString().Trim()
         Write-Ok "your public IP is $ip (it may change; a dynamic DNS name won't)"
@@ -365,9 +381,11 @@ function Invoke-Check {
     if ($install) { Write-Ok "installed: $($install.DisplayName) $($install.DisplayVersion)" } else { Write-Bad 'not installed'; $healthy = $false }
     $tvn = Get-Service -Name tvnserver -ErrorAction SilentlyContinue
     if ($tvn -and $tvn.Status -eq 'Running') { Write-Ok 'service running' } else { Write-Bad 'service not running'; $healthy = $false }
-    $settings = Get-ItemProperty -Path $TightVncKey -ErrorAction SilentlyContinue
-    if ($settings -and $settings.LoopbackOnly -eq 1) { Write-Ok 'accepts connections from this PC only' }
-    else { Write-Bad 'not limited to this PC (LoopbackOnly is off): run this script to fix'; $healthy = $false }
+    # TightVNC's registry key is admin-only, so judge by where it actually listens.
+    $vncListeners = @(Get-NetTCPConnection -State Listen -LocalPort $VncPort -ErrorAction SilentlyContinue | ForEach-Object { $_.LocalAddress })
+    $exposed = @($vncListeners | Where-Object { $_ -notin '127.0.0.1', '::1' })
+    if ($vncListeners.Count -and -not $exposed.Count) { Write-Ok 'accepts connections from this PC only (listening on 127.0.0.1)' }
+    elseif ($exposed.Count) { Write-Bad "listening on $($exposed -join ', '), not just this PC: run this script to fix"; $healthy = $false }
     try {
         $probe = Test-RfbServer -Address 127.0.0.1 -Port $VncPort
         Write-Ok "answers on 127.0.0.1:$VncPort (VNC $($probe.Version), sign-in types $($probe.SecurityTypes -join ', '))"
