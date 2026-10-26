@@ -31,6 +31,9 @@ public final class VNCConnection: NSObjectOrAnyObject {
 	// to do with it) instead of the library writing UIPasteboard from a background thread.
 	public weak var clipboardDelegate: VNCConnectionClipboardDelegate?
 
+	// LOCAL PATCH: told when a whole framebuffer update has been decoded.
+	public weak var frameDelegate: VNCConnectionFrameDelegate?
+
 	// LOCAL PATCH: whether a server may connect with no sign-in at all ("None" security).
 	// Off by default; set before connect().
 	public var isUnauthenticatedAccessAllowed = false

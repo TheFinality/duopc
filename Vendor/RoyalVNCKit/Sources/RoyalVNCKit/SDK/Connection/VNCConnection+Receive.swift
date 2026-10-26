@@ -82,6 +82,9 @@ private extension VNCConnection {
 
 		logger.logDebug("Received Framebuffer Update: \(framebufferUpdate)")
 
+		// LOCAL PATCH: the update is complete (all its regions reported); the client can show it.
+		frameDelegate?.connectionDidFinishFramebufferUpdate(self)
+
 		/*
 		// Write out the framebuffer for testing purposes
 		try framebuffer.writeSurface()

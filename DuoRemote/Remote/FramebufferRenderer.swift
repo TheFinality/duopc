@@ -3,8 +3,8 @@ import QuartzCore
 import IOSurface
 
 /// Draws the remote framebuffer: one textured quad, transformed by the viewport. The texture
-/// wraps the library's IOSurface directly (zero copy), so redrawing picks up whatever the
-/// decoder has written since.
+/// wraps the display IOSurface directly (zero copy); `FramePresenter` refreshes that surface only
+/// once a whole update has arrived.
 final class FramebufferRenderer {
     let device: MTLDevice
     private let queue: MTLCommandQueue

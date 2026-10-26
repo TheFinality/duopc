@@ -4,8 +4,8 @@ import Foundation
 import IOSurface
 import os
 
-/// A framebuffer's IOSurface handed across threads. The library keeps writing into it; we only
-/// sample it on the GPU, so sharing is the point.
+/// A display surface handed across threads: the `FramePresenter` copy of the library's framebuffer,
+/// sampled on the GPU.
 nonisolated struct SurfaceBox: @unchecked Sendable {
     let surface: IOSurface
     let size: CGSize
@@ -19,6 +19,82 @@ nonisolated final class DirtyFlag: @unchecked Sendable {
     func testAndClear() -> Bool { lock.lock(); defer { dirty = false; lock.unlock() }; return dirty }
 }
 
+/// Keeps a display copy of the library's framebuffer and refreshes it only when a whole update has
+/// arrived, so a change appears at once instead of being drawn top to bottom as rectangles decode.
+/// Called on the library's receive thread; the copy happens between updates, while nothing writes.
+nonisolated final class FramePresenter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var back: IOSurface?
+    private var front: IOSurface?
+    private var pending: [(x: Int, y: Int, width: Int, height: Int)] = []
+    private var pendingArea = 0
+
+    /// A display copy of `surface` (the library's framebuffer), filled with its current contents.
+    func attach(_ surface: IOSurface) -> IOSurface? {
+        lock.lock(); defer { lock.unlock() }
+        guard let copy = IOSurface(properties: [
+            .width: surface.width, .height: surface.height,
+            .bytesPerElement: surface.bytesPerElement, .bytesPerRow: surface.bytesPerRow,
+            .pixelFormat: surface.pixelFormat,
+        ]) else { return nil }
+        back = surface
+        front = copy
+        pending = []
+        pendingArea = 0
+        Self.copy(x: 0, y: 0, width: surface.width, height: surface.height, from: surface, to: copy)
+        return copy
+    }
+
+    /// The library decoded into this rectangle (framebuffer pixels); shown at the next `present()`.
+    func markUpdated(x: Int, y: Int, width: Int, height: Int) {
+        guard width > 0, height > 0 else { return }
+        lock.lock(); defer { lock.unlock() }
+        pending.append((x, y, width, height))
+        pendingArea += width * height
+    }
+
+    /// Copies everything updated since the last call into the display copy. False if nothing was.
+    @discardableResult
+    func present() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard let back, let front, !pending.isEmpty else { return false }
+        let w = min(back.width, front.width), h = min(back.height, front.height)
+        if pendingArea >= w * h {
+            Self.copy(x: 0, y: 0, width: w, height: h, from: back, to: front)
+        } else {
+            for r in pending {
+                let x = max(0, r.x), y = max(0, r.y)
+                Self.copy(x: x, y: y, width: min(r.x + r.width, w) - x, height: min(r.y + r.height, h) - y,
+                          from: back, to: front)
+            }
+        }
+        pending.removeAll(keepingCapacity: true)
+        pendingArea = 0
+        return true
+    }
+
+    private static func copy(x: Int, y: Int, width: Int, height: Int, from source: IOSurface, to target: IOSurface) {
+        guard width > 0, height > 0 else { return }
+        source.lock(options: .readOnly, seed: nil)
+        target.lock(options: [], seed: nil)
+        defer {
+            target.unlock(options: [], seed: nil)
+            source.unlock(options: .readOnly, seed: nil)
+        }
+        let bytesPerPixel = source.bytesPerElement
+        let sourceRow = source.bytesPerRow, targetRow = target.bytesPerRow
+        if x == 0, width == source.width, sourceRow == targetRow {
+            memcpy(target.baseAddress + y * targetRow, source.baseAddress + y * sourceRow, height * sourceRow)
+            return
+        }
+        for row in y..<(y + height) {
+            memcpy(target.baseAddress + row * targetRow + x * bytesPerPixel,
+                   source.baseAddress + row * sourceRow + x * bytesPerPixel,
+                   width * bytesPerPixel)
+        }
+    }
+}
+
 /// Why a gateway connection was turned down, when it was.
 nonisolated enum GatewayIssue: Sendable, Equatable {
     case certificateMismatch, notPaired
@@ -26,13 +102,16 @@ nonisolated enum GatewayIssue: Sendable, Equatable {
 
 /// RoyalVNCKit's delegate. Called on background threads (and synchronously on the caller's
 /// thread for `.connecting` / user disconnects), so it is nonisolated and hops to the main actor
-/// in FIFO order. Framebuffer rect updates do NOT hop: they only set the dirty flag.
-nonisolated final class ConnectionBridge: NSObject, VNCConnectionDelegate, VNCConnectionClipboardDelegate, @unchecked Sendable {
+/// in FIFO order. Framebuffer updates do NOT hop: they're copied for display once complete, then
+/// set the dirty flag.
+nonisolated final class ConnectionBridge: NSObject, VNCConnectionDelegate, VNCConnectionClipboardDelegate,
+                                          VNCConnectionFrameDelegate, @unchecked Sendable {
     struct Credentials: Sendable { let username: String; let password: String }
 
     private let credentials: Credentials?
     private let allowOtherAuth: Bool
     private let dirty: DirtyFlag
+    private let presenter = FramePresenter()
     private let log: (@Sendable (String) -> Void)?
     /// Set when the PC asked for a kind of sign-in we won't answer.
     private let refusedAuth = OSAllocatedUnfairLock(initialState: false)
@@ -105,7 +184,11 @@ nonisolated final class ConnectionBridge: NSObject, VNCConnectionDelegate, VNCCo
 
     func connection(_ connection: VNCConnection, didUpdateFramebuffer framebuffer: VNCFramebuffer,
                     x: UInt16, y: UInt16, width: UInt16, height: UInt16) {
-        dirty.set()
+        presenter.markUpdated(x: Int(x), y: Int(y), width: Int(width), height: Int(height))
+    }
+
+    func connectionDidFinishFramebufferUpdate(_ connection: VNCConnection) {
+        if presenter.present() { dirty.set() }
     }
 
     func connection(_ connection: VNCConnection, didUpdateCursor cursor: VNCCursor) {
@@ -123,8 +206,8 @@ nonisolated final class ConnectionBridge: NSObject, VNCConnectionDelegate, VNCCo
     private func publish(_ framebuffer: VNCFramebuffer) {
         let size = framebuffer.cgSize
         log?("framebuffer \(Int(size.width))×\(Int(size.height))")
-        guard let surface = framebuffer.ioSurface else { return }
-        let box = SurfaceBox(surface: surface, size: size)
+        guard let surface = framebuffer.ioSurface, let display = presenter.attach(surface) else { return }
+        let box = SurfaceBox(surface: display, size: size)
         dirty.set()
         onMain { session, bridge in session.bridge(bridge, didSetFramebuffer: box) }
     }

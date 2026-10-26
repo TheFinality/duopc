@@ -185,6 +185,7 @@ final class VNCSession {
                                       dirty: frameDirty, log: log)
         connection.delegate = bridge
         connection.clipboardDelegate = bridge
+        connection.frameDelegate = bridge
         self.connection = connection
         self.bridge = bridge
         userDisconnecting = false

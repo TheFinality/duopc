@@ -34,3 +34,7 @@ Only `Sources/{RoyalVNCKit,RoyalVNCKitC,Z,d3des}` and `LICENSE` were copied. Eve
    instead of after it's decoded (plus a fresh one after the first or a resizing update); the send loop idles 4 ms instead
    of 10 ms; Tight JPEG quality and compression level are public (`jpegQualityLevel`, `compressionLevel`, defaults 6 and 5,
    as before) and `updateQuality(jpegQuality:compressionLevel:)` re-sends SetEncodings while connected.
+10. Whole-frame updates (`SDK/VNCConnectionFrameDelegate.swift`, new; `SDK/Connection/VNCConnection.swift`, `+Receive.swift`):
+   `VNCConnection.frameDelegate` gets `connectionDidFinishFramebufferUpdate(_:)` once every rectangle of a FramebufferUpdate is
+   decoded and reported, before the next one is read, so the client can present complete frames instead of drawing the
+   framebuffer while it's being written.

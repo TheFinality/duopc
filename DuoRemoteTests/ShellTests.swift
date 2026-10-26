@@ -1,6 +1,7 @@
 import Testing
 import CoreGraphics
 import Foundation
+import IOSurface
 @testable import DuoRemote
 
 struct ShellTests {
@@ -69,3 +70,53 @@ struct CodeIntegrityTests {
     }
 }
 
+struct FramePresenterTests {
+    private func surface(_ width: Int, _ height: Int, fill: UInt8) throws -> IOSurface {
+        let s = try #require(IOSurface(properties: [.width: width, .height: height, .bytesPerElement: 4,
+                                                    .bytesPerRow: width * 4, .pixelFormat: UInt32(0x4247_5241)]))  // 'BGRA'
+        s.lock(options: [], seed: nil)
+        memset(s.baseAddress, Int32(fill), s.allocationSize)
+        s.unlock(options: [], seed: nil)
+        return s
+    }
+
+    private func pixel(_ s: IOSurface, _ x: Int, _ y: Int) -> UInt8 {
+        s.lock(options: .readOnly, seed: nil)
+        defer { s.unlock(options: .readOnly, seed: nil) }
+        return s.baseAddress.load(fromByteOffset: y * s.bytesPerRow + x * 4, as: UInt8.self)
+    }
+
+    private func paint(_ s: IOSurface, x: Int, y: Int, width: Int, height: Int, _ value: UInt8) {
+        s.lock(options: [], seed: nil)
+        defer { s.unlock(options: [], seed: nil) }
+        for row in y..<(y + height) { memset(s.baseAddress + row * s.bytesPerRow + x * 4, Int32(value), width * 4) }
+    }
+
+    @Test func updatesAppearOnlyWhenPresented() throws {
+        let back = try surface(64, 32, fill: 1)
+        let presenter = FramePresenter()
+        let front = try #require(presenter.attach(back))
+        #expect(pixel(front, 10, 10) == 1)                       // starts as a copy
+
+        paint(back, x: 0, y: 0, width: 64, height: 16, 7)         // an update, half decoded,
+        presenter.markUpdated(x: 0, y: 0, width: 64, height: 16)
+        #expect(pixel(front, 10, 10) == 1)                       // isn't shown yet
+
+        paint(back, x: 0, y: 16, width: 64, height: 16, 7)
+        presenter.markUpdated(x: 0, y: 16, width: 64, height: 16)
+        #expect(presenter.present())
+        #expect(pixel(front, 10, 10) == 7 && pixel(front, 10, 30) == 7)   // all of it at once
+        #expect(!presenter.present())                            // nothing new since
+    }
+
+    @Test func onlyReportedRegionsAreCopied() throws {
+        let back = try surface(64, 32, fill: 1)
+        let presenter = FramePresenter()
+        let front = try #require(presenter.attach(back))
+        paint(back, x: 0, y: 0, width: 64, height: 32, 9)         // changed everywhere, but only
+        presenter.markUpdated(x: 8, y: 4, width: 4, height: 4)    // this rectangle was reported
+        presenter.present()
+        #expect(pixel(front, 9, 5) == 9)
+        #expect(pixel(front, 40, 20) == 1)
+    }
+}
