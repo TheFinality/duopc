@@ -99,8 +99,24 @@ nonisolated enum CodeIntegrity {
 
     /// Damaged page offsets in this app's own executable, read from disk.
     static func checkInstalledApp() -> [Int]? {
-        guard let url = Bundle.main.executableURL,
-              let data = try? Data(contentsOf: url, options: .alwaysMapped) else { return nil }
+        guard let url = Bundle.main.executableURL, let data = readUncached(url) else { return nil }
         return damagedPages(in: data)
+    }
+
+    /// Plain reads with the file cache bypassed. Not a memory map: iOS kills a hardened process
+    /// that faults in a page of its own executable that fails validation, even just to read it.
+    private static func readUncached(_ url: URL) -> Data? {
+        let fd = open(url.path, O_RDONLY)
+        guard fd >= 0 else { return nil }
+        defer { close(fd) }
+        _ = fcntl(fd, F_NOCACHE, 1)
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 1 << 20)
+        while true {
+            let count = buffer.withUnsafeMutableBytes { read(fd, $0.baseAddress, $0.count) }
+            if count == 0 { return data }
+            guard count > 0 else { return nil }
+            data.append(contentsOf: buffer[0..<count])
+        }
     }
 }
