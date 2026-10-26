@@ -149,3 +149,23 @@ public extension VNCConnection {
 		keyUp(.init(key))
 	}
 }
+
+// LOCAL PATCH: picture quality, adjustable while connected.
+public extension VNCConnection {
+	/// Asks the server for a different Tight JPEG quality and compression level (0-9). Takes effect
+	/// from the next update, without reconnecting.
+	func updateQuality(jpegQuality: Int, compressionLevel: Int) {
+		jpegQualityLevel = jpegQuality
+		self.compressionLevel = compressionLevel
+		guard connectionState.status == .connected,
+			  let encodings = try? orderedEncodingTypes() else { return }
+		enqueueClientToServerMessage(VNCProtocol.SetEncodings(encodingTypes: encodings))
+	}
+}
+
+extension VNCConnection {
+	/// RFB quality pseudo-encodings: base + level, level clamped to 0-9.
+	static func pseudoEncoding(base: Int64, level: Int) -> VNCEncodingType {
+		VNCEncodingType(rawValue: base + Int64(min(max(level, 0), 9)))!
+	}
+}

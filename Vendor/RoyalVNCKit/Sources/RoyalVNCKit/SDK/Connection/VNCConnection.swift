@@ -37,6 +37,11 @@ public final class VNCConnection: NSObjectOrAnyObject {
 
 	// LOCAL PATCH: connect through a DuoPC Gateway (pinned TLS 1.3 + pairing token). Set before connect().
 	public var gateway: VNCGatewaySettings?
+
+	// LOCAL PATCH: Tight JPEG quality and zlib compression level, 0-9 as in RFB. Set before connect(),
+	// or change while connected with `updateQuality(jpegQuality:compressionLevel:)`.
+	public var jpegQualityLevel = 6
+	public var compressionLevel = 5
 	let gatewayPinCheck = VNCGatewayPinCheck()
 
 #if canImport(ObjectiveC)
@@ -186,13 +191,13 @@ public final class VNCConnection: NSObjectOrAnyObject {
 			// TODO: Implement
 //			VNCPseudoEncodingType.extendedClipboard.rawValue,
             
-            // TODO: Make configurable
-			VNCPseudoEncodingType.compressionLevel6.rawValue
+            // LOCAL PATCH: configurable (was compressionLevel6, i.e. RFB level 5)
+			Self.pseudoEncoding(base: -256, level: compressionLevel)
 		])
 
 		if usesTightEncoding {
-            // TODO: Make configurable
-			encs.append(VNCPseudoEncodingType.jpegQualityLevel6.rawValue)
+            // LOCAL PATCH: configurable (was jpegQualityLevel6)
+			encs.append(Self.pseudoEncoding(base: -32, level: jpegQualityLevel))
 		}
 
 		let uniqueEncs = encs.uniqued()

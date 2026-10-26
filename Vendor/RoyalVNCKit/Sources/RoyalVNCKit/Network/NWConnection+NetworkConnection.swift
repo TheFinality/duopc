@@ -14,6 +14,9 @@ extension NWConnection: NetworkConnection {
     convenience init(settings: NetworkConnectionSettings) {
         let tcpOptions = NWProtocolTCP.Options()
         tcpOptions.connectionTimeout = settings.connectionTimeout
+        // LOCAL PATCH: no Nagle. Pointer moves and update requests are tiny writes; holding them
+        // until the previous write is acknowledged adds a round trip to each over mobile data.
+        tcpOptions.noDelay = true
 
         // LOCAL PATCH: DuoPC Gateway connections are TLS 1.3, pinned to the paired certificate.
         let tlsOptions = settings.gateway.map { NWConnection.gatewayTLSOptions(pinning: $0.certificateSHA256,

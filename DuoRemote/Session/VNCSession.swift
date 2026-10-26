@@ -6,6 +6,32 @@ import Observation
 import UIKit
 import UniformTypeIdentifiers
 
+/// How hard the PC compresses its screen (Tight JPEG quality and zlib level). Lower quality is
+/// faster on a slow link; TightVNC re-sends areas that stop changing losslessly, so still text
+/// sharpens either way.
+enum PictureQuality: String, CaseIterable, Identifiable {
+    case fast, balanced, sharp
+
+    var id: String { rawValue }
+    static let storageKey = "pictureQuality"
+    static var current: PictureQuality {
+        UserDefaults.standard.string(forKey: storageKey).flatMap(PictureQuality.init(rawValue:)) ?? .balanced
+    }
+
+    var title: String {
+        switch self { case .fast: "Fast"; case .balanced: "Balanced"; case .sharp: "Sharp" }
+    }
+
+    var jpegQuality: Int {
+        switch self { case .fast: 3; case .balanced: 6; case .sharp: 8 }
+    }
+
+    /// Higher squeezes harder (less data, more PC time): worth it on a slow upload, not on Wi-Fi.
+    var compressionLevel: Int {
+        switch self { case .fast: 6; case .balanced: 5; case .sharp: 3 }
+    }
+}
+
 /// What the canvas view implements so the session can poke it (imperative, high frequency —
 /// deliberately not observation).
 protocol SessionDisplay: AnyObject {
@@ -151,6 +177,9 @@ final class VNCSession {
         let connection = VNCConnection(settings: settings)
         connection.isUnauthenticatedAccessAllowed = allowOtherAuth   // a PC with no sign-in at all
         connection.gateway = gateway
+        let quality = PictureQuality.current
+        connection.jpegQualityLevel = quality.jpegQuality
+        connection.compressionLevel = quality.compressionLevel
         if gateway != nil { note("direct: TLS 1.3, pinned certificate") }
         let bridge = ConnectionBridge(session: self, credentials: credentials, allowOtherAuth: allowOtherAuth,
                                       dirty: frameDirty, log: log)
@@ -406,6 +435,15 @@ final class VNCSession {
         copy.draw(wrapped, in: CGRect(x: -crop.minX, y: crop.maxY - CGFloat(surf.height),
                                       width: CGFloat(surf.width), height: CGFloat(surf.height)))
         return copy.makeImage().map { UIImage(cgImage: $0) }
+    }
+
+    // MARK: Picture quality
+
+    /// Applies straight away (no reconnect) and becomes the default for new connections.
+    func applyPictureQuality(_ quality: PictureQuality) {
+        UserDefaults.standard.set(quality.rawValue, forKey: PictureQuality.storageKey)
+        connection?.updateQuality(jpegQuality: quality.jpegQuality, compressionLevel: quality.compressionLevel)
+        note("picture quality: \(quality.rawValue)")
     }
 
     // MARK: View commands

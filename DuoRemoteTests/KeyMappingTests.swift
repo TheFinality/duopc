@@ -43,4 +43,12 @@ struct KeyMappingTests {
         #expect(WindowsShortcut.showDesktop.keys == [VNCKeyCode.command, VNCKeyCode(asciiCharacter: UInt8(ascii: "d"))])
         #expect(WindowsShortcut.allCases.allSatisfy { !$0.keys.isEmpty })
     }
+
+    @Test func pictureQualityOrdersSharpness() {
+        #expect(PictureQuality.fast.jpegQuality < PictureQuality.balanced.jpegQuality)
+        #expect(PictureQuality.balanced.jpegQuality < PictureQuality.sharp.jpegQuality)
+        #expect(PictureQuality.allCases.allSatisfy { (0...9).contains($0.jpegQuality) && (0...9).contains($0.compressionLevel) })
+        // Balanced is what the library asked for before this was adjustable.
+        #expect(PictureQuality.balanced.jpegQuality == 6 && PictureQuality.balanced.compressionLevel == 5)
+    }
 }

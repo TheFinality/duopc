@@ -63,7 +63,8 @@ private extension VNCConnection {
 		guard !state.disconnectRequested,
               connection.isReady,
 			  let message = clientToServerMessageQueue.dequeue() else {
-			try await Task.sleep(seconds: 0.01)
+			// LOCAL PATCH: 4 ms (was 10 ms): input waits here before it's sent.
+			try await Task.sleep(seconds: 0.004)
 
 			return
 		}

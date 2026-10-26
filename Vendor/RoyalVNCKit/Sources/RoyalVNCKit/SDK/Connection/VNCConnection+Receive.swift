@@ -67,6 +67,14 @@ private extension VNCConnection {
 
 		logger.logDebug("Receiving Framebuffer Update")
 
+		// LOCAL PATCH: ask for the next update as soon as this one starts arriving, not after it's
+		// decoded, so the server can prepare it while this one downloads (one round trip less per
+		// frame). Self-limiting: still one new request per update received.
+		let requestedEarly = state.incrementalUpdatesEnabled
+		if requestedEarly {
+			try await sendFramebufferUpdateRequest()
+		}
+
 		let framebufferUpdate = try await VNCProtocol.FramebufferUpdate.receive(connection: connection,
 																				framebuffer: framebuffer,
 																				encodings: encodings,
@@ -79,7 +87,10 @@ private extension VNCConnection {
 		try framebuffer.writeSurface()
 		*/
 
-		try await sendFramebufferUpdateRequest()
+		// The first (full) update, or one that resized the framebuffer, needs a fresh request.
+		if !requestedEarly || !state.incrementalUpdatesEnabled {
+			try await sendFramebufferUpdateRequest()
+		}
 	}
 
 	func handleSetColourMapEntriesMessage() async throws {

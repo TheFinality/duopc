@@ -6,6 +6,7 @@ struct SettingsView: View {
     @AppStorage("defaultInputMode") private var inputMode = InputMode.trackpad.rawValue
     @AppStorage("scrollSpeed") private var scrollSpeed = VNCSession.defaultScrollSpeed
     @AppStorage("invertScroll") private var invertScroll = false
+    @AppStorage(PictureQuality.storageKey) private var pictureQuality: PictureQuality = .balanced
     @AppStorage("autoCompose") private var autoCompose = true
     @AppStorage("effectsEnabled") private var effectsEnabled = true
     @AppStorage("skyTheme") private var skyTheme = true
@@ -53,6 +54,16 @@ struct SettingsView: View {
                     Text("Controls")
                 } footer: {
                     Text("Natural scrolling moves content with your finger. Changes apply to the next connection.")
+                }
+
+                Section {
+                    Picker("Picture quality", selection: $pictureQuality) {
+                        ForEach(PictureQuality.allCases) { Text($0.title).tag($0) }
+                    }
+                } header: {
+                    Text("Screen")
+                } footer: {
+                    Text("Fast sends a softer picture while things move, which keeps up better over mobile data or a slow home upload. Text sharpens once it stops changing. You can also switch while connected: ••• → Picture quality.")
                 }
 
                 Section("Privacy") {

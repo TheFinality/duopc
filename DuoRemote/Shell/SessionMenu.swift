@@ -11,6 +11,7 @@ struct SessionMenu: View {
     @State private var continueToCopy = false
     @AppStorage("hasSeenCopyTextIntro") private var hasSeenCopyIntro = false
     @AppStorage("autoCompose") private var autoCompose = true
+    @AppStorage(PictureQuality.storageKey) private var pictureQuality: PictureQuality = .balanced
 
     private func openCopyText() {
         if let img = session.visibleSnapshot() { liveText = LiveTextImage(image: img) }
@@ -25,6 +26,12 @@ struct SessionMenu: View {
             Toggle(isOn: $autoCompose) {
                 Label("Text box on click into text", systemImage: "character.cursor.ibeam")
             }
+            Picker(selection: $pictureQuality) {
+                ForEach(PictureQuality.allCases) { Text($0.title).tag($0) }
+            } label: {
+                Label("Picture quality", systemImage: "photo")
+            }
+            .pickerStyle(.menu)
             Section {
                 Button("Zoom to fit", systemImage: "arrow.down.right.and.arrow.up.left") { session.zoomToFit() }
                 Button("Actual pixels", systemImage: "1.magnifyingglass") { session.zoomToActualPixels() }
@@ -51,6 +58,7 @@ struct SessionMenu: View {
                 .labelStyle(.iconOnly)
                 .frame(minWidth: 36, minHeight: 36)
         }
+        .onChange(of: pictureQuality) { _, quality in session.applyPictureQuality(quality) }
         .sheet(isPresented: $showLog) { ConnectionLogView(session: session) }
         .sheet(isPresented: $showScrollSpeed) { ScrollSpeedSheet(session: session, coordinator: coordinator) }
         .fullScreenCover(item: $liveText) { LiveTextSheet(image: $0.image) }

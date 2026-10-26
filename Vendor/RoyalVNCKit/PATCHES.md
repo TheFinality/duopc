@@ -29,3 +29,8 @@ Only `Sources/{RoyalVNCKit,RoyalVNCKitC,Z,d3des}` and `LICENSE` were copied. Eve
    sends `"DPC1"` + the 32-byte pairing token and waits for 0x00 (accepted) or 0x01 (→ `ConnectionError.gatewayRejected`)
    before the VNC handshake. A pin mismatch is reported as `ConnectionError.gatewayCertificateMismatch`. Plain connections
    (`gateway == nil`) are unchanged.
+9. Latency (`Network/NWConnection+NetworkConnection.swift`, `SDK/Connection/VNCConnection.swift`, `+API.swift`, `+Receive.swift`,
+   `+Send.swift`): TCP `noDelay`; the next incremental FramebufferUpdateRequest is sent when an update starts arriving
+   instead of after it's decoded (plus a fresh one after the first or a resizing update); the send loop idles 4 ms instead
+   of 10 ms; Tight JPEG quality and compression level are public (`jpegQualityLevel`, `compressionLevel`, defaults 6 and 5,
+   as before) and `updateQuality(jpegQuality:compressionLevel:)` re-sends SetEncodings while connected.
