@@ -31,20 +31,39 @@ struct SessionScreen: View {
     private let forceLaptop = false
     #endif
 
+    /// The last horizontal fold seen, and the window size it was seen in.
+    @State private var rememberedFold: (fold: CGRect, size: CGSize)?
+    /// Laptop pose as laid out: `poseFold`, except that leaving waits a moment (see `settlePose`).
+    @State private var laptopFold: CGRect?
+    @State private var laptopSize: CGSize = .zero
+    @State private var poseSettle: Task<Void, Never>?
+
     /// Laptop pose: the fold running across the window, half-open → screen on top, deck below.
     /// Also when flat, and on any tall window wide enough for the deck (iPad portrait).
-    private var laptopFold: CGRect? {
+    private var poseFold: CGRect? {
         if forceLaptop, fullSize.height > 0 {
             return CGRect(x: 0, y: fullSize.height * 0.5 - 6, width: fullSize.width, height: 12)
         }
-        if hingeHalfOpen, let fold, fold.width > fold.height { return fold }
-        if hingeFlat, let flatFold, flatFold.width > flatFold.height { return flatFold }
-        // A flat Duo with no fold reported, or any tall window wide enough for a deck (an iPad in
-        // portrait): split across the middle.
-        if hingeFlat || fullSize.width >= Self.deckMinWidth, fullSize.height > fullSize.width {
-            return CGRect(x: 0, y: fullSize.height / 2, width: fullSize.width, height: 0)
+        return LaptopPose.fold(halfOpen: hingeHalfOpen, flat: hingeFlat, active: fold, inactive: flatFold,
+                               remembered: rememberedFold?.size == fullSize ? rememberedFold?.fold : nil,
+                               size: fullSize, deckMinWidth: Self.deckMinWidth)
+    }
+
+    /// Enters laptop pose at once, but leaves it only if it's still gone a moment later: while the
+    /// hinge moves, its readings flicker, and each exit rebuilt the whole screen (a blank frame,
+    /// the keyboard dropped). A new window size (the app moved to the other screen) leaves at once.
+    private func settlePose(_ new: CGRect?) {
+        poseSettle?.cancel()
+        if new != nil || laptopFold == nil || fullSize != laptopSize {
+            laptopFold = new
+            laptopSize = fullSize
+            return
         }
-        return nil
+        poseSettle = Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            laptopFold = poseFold
+        }
     }
 
     private var barSplit: FoldSplit? {
@@ -96,12 +115,16 @@ struct SessionScreen: View {
                         // While half-open, keep the last fold through momentary dropouts.
                         if new != nil || !hingeHalfOpen { fold = new }
                     }
+                    .onGeometryChange(for: FoldReading.self) { FoldReading(fold: DuoFold.division(in: $0), size: $0.size) } action: { r in
+                        if let f = r.fold, f.width > f.height { rememberedFold = (f, r.size) }
+                    }
                     .onGeometryChange(for: CGRect?.self) { DuoFold.divisionIncludingInactive(in: $0) } action: { flatFold = $0 }
             }
             .onHingeChange { _, new in
                 hingeHalfOpen = new.hinge?.status == .partiallyOpen
                 hingeFlat = new.hinge?.status == .fullyOpen
             }
+            .onChange(of: poseFold, initial: true) { _, new in settlePose(new) }
             .onChange(of: laptopFold == nil) { _, notLaptop in
                 if notLaptop { keyboardShown = false } else { restoreDeckKeyboard() }
             }
@@ -244,6 +267,12 @@ struct SessionScreen: View {
                 }
             }
     }
+}
+
+/// The fold and the window size it was measured in, read together so neither is stale.
+private nonisolated struct FoldReading: Equatable, Sendable {
+    var fold: CGRect?
+    var size: CGSize
 }
 
 /// The key bar, split either side of a vertical fold when one crosses it.

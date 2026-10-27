@@ -108,8 +108,12 @@ struct OuterPictureAccessory: ViewModifier {
     @AppStorage(OuterPicture.versionKey) private var version = 0
     @Environment(\.scenePhase) private var scenePhase
     @State private var picture: UIImage?
+    /// `wanted`, except that turning off waits a moment: the hinge readings flicker while it
+    /// moves, and each blink stopped the camera and took the picture away.
+    @State private var showing = false
+    @State private var settle: Task<Void, Never>?
 
-    private var run: Bool {
+    private var wanted: Bool {
         OuterPicture.cameraShouldRun(enabled: enabled, hasPicture: picture != nil, unfolded: unfolded,
                                      active: scenePhase == .active)
     }
@@ -117,7 +121,7 @@ struct OuterPictureAccessory: ViewModifier {
     func body(content: Content) -> some View {
         content
             .sceneAccessory {
-                CameraCaptureAccessory(isEnabled: .constant(run)) {
+                CameraCaptureAccessory(isEnabled: .constant(showing)) {
                     OuterPictureView(picture: picture)
                 }
                 .onAvailabilityChange { available in
@@ -125,8 +129,22 @@ struct OuterPictureAccessory: ViewModifier {
                 }
             }
             .task(id: version) { picture = version > 0 ? OuterPicture.load() : nil }
-            .onChange(of: run, initial: true) { _, run in OuterPictureCamera.shared.setRunning(run) }
-            .onDisappear { OuterPictureCamera.shared.setRunning(false) }
+            .onChange(of: wanted, initial: true) { _, wanted in
+                settle?.cancel()
+                if wanted || !enabled || scenePhase != .active {
+                    showing = wanted
+                } else {
+                    settle = Task {
+                        try? await Task.sleep(for: .seconds(1))
+                        if !Task.isCancelled { showing = false }
+                    }
+                }
+            }
+            .onChange(of: showing, initial: true) { _, showing in OuterPictureCamera.shared.setRunning(showing) }
+            .onDisappear {
+                settle?.cancel()
+                OuterPictureCamera.shared.setRunning(false)
+            }
     }
 }
 

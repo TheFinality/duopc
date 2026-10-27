@@ -122,6 +122,49 @@ struct FramePresenterTests {
     }
 }
 
+struct LaptopPoseTests {
+    let size = CGSize(width: 600, height: 800)
+    let active = CGRect(x: 0, y: 394, width: 600, height: 12)
+    let inactive = CGRect(x: 0, y: 400, width: 600, height: 0)
+
+    private func pose(halfOpen: Bool = false, flat: Bool = false, active: CGRect? = nil, inactive: CGRect? = nil,
+                      remembered: CGRect? = nil, size: CGSize? = nil) -> CGRect? {
+        LaptopPose.fold(halfOpen: halfOpen, flat: flat, active: active, inactive: inactive, remembered: remembered,
+                        size: size ?? self.size, deckMinWidth: 700)
+    }
+
+    @Test func halfOpenSplitsAtTheFold() {
+        #expect(pose(halfOpen: true, active: active) == active)
+        #expect(pose(active: active) == nil)                               // closed, or no hinge
+    }
+
+    @Test func aMissingFoldReadingKeepsTheLastOne() {
+        // The hinge says half-open before the fold arrives, or the fold drops out mid-move.
+        #expect(pose(halfOpen: true, remembered: active) == active)
+        #expect(pose(halfOpen: true, inactive: inactive, remembered: active) == active)
+    }
+
+    @Test func flatSplitsWhereHalfOpenDid() {
+        #expect(pose(flat: true, inactive: inactive, remembered: active) == active)
+        #expect(pose(flat: true, inactive: inactive) == inactive)
+        // A fold somewhere else isn't the remembered one.
+        let lower = CGRect(x: 0, y: 500, width: 600, height: 0)
+        #expect(pose(flat: true, inactive: lower, remembered: active) == lower)
+        #expect(pose(flat: true) == CGRect(x: 0, y: 400, width: 600, height: 0))
+    }
+
+    @Test func verticalFoldsAreNotLaptopPose() {
+        let book = CGRect(x: 294, y: 0, width: 12, height: 800)
+        #expect(pose(halfOpen: true, active: book) == nil)
+        #expect(pose(halfOpen: true, remembered: book) == nil)
+    }
+
+    @Test func wideTallWindowsGetTheDeck() {
+        #expect(pose(size: CGSize(width: 820, height: 1180)) == CGRect(x: 0, y: 590, width: 820, height: 0))
+        #expect(pose(size: CGSize(width: 1180, height: 820)) == nil)
+    }
+}
+
 struct OuterPictureTests {
     @Test func cameraRunsOnlyWhileThePictureCanShow() {
         #expect(OuterPicture.cameraShouldRun(enabled: true, hasPicture: true, unfolded: true, active: true))

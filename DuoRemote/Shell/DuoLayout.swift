@@ -16,6 +16,30 @@ nonisolated enum DuoFold {
     }
 }
 
+/// Where laptop pose splits the window. The hinge reading and the fold's place arrive separately
+/// and either can drop out for a moment while the hinge moves, so a horizontal fold seen earlier
+/// in this same window size (`remembered`) stands in for a missing one. Half-open and flat then
+/// split at the same place, and the layout doesn't jump as the hinge crosses between them.
+nonisolated enum LaptopPose {
+    static func fold(halfOpen: Bool, flat: Bool, active: CGRect?, inactive: CGRect?, remembered: CGRect?,
+                     size: CGSize, deckMinWidth: CGFloat) -> CGRect? {
+        func horizontal(_ r: CGRect?) -> CGRect? { r.flatMap { $0.width > $0.height ? $0 : nil } }
+        if halfOpen || flat {
+            if let active = horizontal(active) { return active }
+            let inactive = horizontal(inactive)
+            if let remembered = horizontal(remembered),
+               inactive.map({ abs($0.midY - remembered.midY) < 2 }) ?? true { return remembered }
+            if let inactive { return inactive }
+        }
+        // A flat Duo with no fold reported, or any tall window wide enough for a deck (an iPad in
+        // portrait): split across the middle.
+        if flat || size.width >= deckMinWidth, size.height > size.width {
+            return CGRect(x: 0, y: size.height / 2, width: size.width, height: 0)
+        }
+        return nil
+    }
+}
+
 /// How a bar is divided around a vertical fold: widths of the leading part, the fold gap and the
 /// trailing part. All in the bar's own coordinates.
 nonisolated struct FoldSplit: Equatable, Sendable {
