@@ -24,6 +24,9 @@ Paired PCs stream the screen as **video** by default: your NVIDIA card encodes i
 - **Needs** an NVIDIA graphics card with driver **570 or newer** (update it with the NVIDIA App or from nvidia.com). `Setup-DuoPC.ps1` installs the streamer and FFmpeg; `-Check` tests the encoder.
 - **Keeps the delay down:** the phone acknowledges every frame, and if the network backs up the PC skips frames instead of queueing them, then sends a fresh picture once it catches up. A still screen costs almost no bandwidth. ••• → Connection log shows fps, Mbps, skipped frames and round trip every few seconds.
 - **Picture quality** sets the bitrate: Fast 8 Mbps (mobile data), Balanced 20 Mbps, Sharp 45 Mbps (home Wi-Fi). Changing it restarts the video for a moment.
+- **Automatic quality** (on by default) lowers the bitrate while the network can't keep up, and raises it back towards your Picture quality once it's been clear for a while. Each step restarts the video for a moment.
+- **PC sound** (on by default): what the PC plays comes out of the phone (AAC, 128 kbps, about a tenth of a second behind). The PC's own speakers keep playing too.
+- **Connection info** (••• menu or Settings): delay, frame rate and data rate in a corner, amber while the network is backing up.
 - **Switch to VNC** any time: ••• → Video streaming, or per PC in Edit PC. Windows doesn't let normal screen capture see the lock screen or admin (UAC) prompts; when one is up, the app offers **Use VNC for now**.
 - Not yet in video mode: the PC's clipboard coming to the iPhone, the pointer's shape (you see an arrow), and Ctrl+Alt+Del (Windows ignores it unless it comes through VNC).
 
@@ -152,7 +155,7 @@ Everything else is DuoRemote: laptop pose, trackpad and direct touch, momentum s
 
 **What's exposed to the internet:** one TCP port, answered only by DuoPC Gateway.
 
-- **Encryption.** Everything between the phone and the gateway (screen, keystrokes, clipboard, the VNC password) is inside TLS 1.3. The gateway accepts nothing older.
+- **Encryption.** Everything between the phone and the gateway (screen, sound, keystrokes, clipboard, the VNC password) is inside TLS 1.3. The gateway accepts nothing older.
 - **The phone knows it's your PC.** The gateway makes a self-signed P-256 certificate on first run. The pairing code carries its SHA-256, and the app accepts that certificate and no other, on any network. If it ever changes (you reinstalled, or something else is answering), the app refuses and sends nothing; pair again.
 - **The PC knows it's your phone.** Each pairing gives the phone a random 256-bit token, kept in the iPhone's Keychain (this device only, never synced). The gateway keeps only its SHA-256, compares in constant time, and closes the connection before any VNC traffic unless the token matches. An address that sends 5 wrong tokens within 15 minutes is blocked for an hour. Unpair a lost phone with `DuoPCGateway revoke`.
 - **TightVNC can't be reached from the network.** It accepts connections only from 127.0.0.1 (TightVNC's *loopback only* setting plus its access list), and its port isn't opened in the firewall. Its random 8-character password is a second lock behind the gateway, not the main one.

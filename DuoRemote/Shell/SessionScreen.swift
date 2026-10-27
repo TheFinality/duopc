@@ -333,12 +333,37 @@ private extension View {
     }
 }
 
-/// Status overlay and the collapsed-bar button. Both stay on the larger side of any fold.
+/// Round trip, frame rate and bitrate in a corner (••• → Connection info). Amber while the network
+/// is backing up; "cap" shows automatic quality has lowered the bitrate.
+private struct ConnectionBadge: View {
+    let stats: VideoStats
+
+    var body: some View {
+        let mbps = Double(stats.kbps) / 1000
+        let lowered = stats.capKbps.flatMap { $0 < PictureQuality.current.videoBitrateKbps ? $0 / 1000 : nil }
+        HStack(spacing: 6) {
+            Circle()
+                .fill(stats.isStrained ? Color.orange : Color.green)
+                .frame(width: 7, height: 7)
+            Text("\(stats.roundTripMs) ms · \(stats.fps) fps · \(mbps, format: .number.precision(.fractionLength(1))) Mbps")
+            if let lowered { Text("· cap \(lowered)").foregroundStyle(.orange) }
+        }
+        .font(.caption2.monospacedDigit().weight(.medium))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .glassEffect(.regular, in: .capsule)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Status overlay, the collapsed-bar button and the connection badge. All stay on the larger side of any fold.
 private struct FloatingChrome: View {
     let session: VNCSession
     let coordinator: SessionCoordinator
     @Binding var barCollapsed: Bool
     @State private var clear: CGRect?
+    @AppStorage("showConnectionInfo") private var showConnectionInfo = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -347,6 +372,13 @@ private struct FloatingChrome: View {
             ZStack(alignment: .topLeading) {
                 status
                     .position(x: region.midX, y: region.midY)
+                if showConnectionInfo, session.isVideo, let stats = session.videoStats {
+                    ConnectionBadge(stats: stats)
+                        .padding(12)
+                        .frame(width: region.width, height: region.height, alignment: .topTrailing)
+                        .position(x: region.midX, y: region.midY)
+                        .transition(.opacity)
+                }
                 if barCollapsed {
                     Button("Show keys", systemImage: "keyboard.chevron.compact.up") {
                         withAnimation(.snappy) { barCollapsed = false }

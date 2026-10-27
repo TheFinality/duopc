@@ -127,7 +127,13 @@ final class VNCSession {
     private(set) var isVideo = false
     /// A notice from the PC about the video (e.g. its screen can't be captured right now).
     private(set) var videoNotice: String?
+    /// The video link's latest stats (once a second), for the connection badge.
+    private(set) var videoStats: VideoStats?
     @ObservationIgnored private var videoStatsCount = 0
+    /// Play the PC's sound (video streaming only). Read live, so the switch applies straight away.
+    static var soundEnabled: Bool { UserDefaults.standard.object(forKey: "pcSound") as? Bool ?? true }
+    /// Let the PC lower the bitrate while the network can't keep up.
+    static var autoQualityEnabled: Bool { UserDefaults.standard.object(forKey: "autoQuality") as? Bool ?? true }
     @ObservationIgnored private var bridge: ConnectionBridge?
     @ObservationIgnored private var userDisconnecting = false
     @ObservationIgnored private var pendingMove = false
@@ -235,7 +241,8 @@ final class VNCSession {
         guard !isDemo else { return }
         tearDown()
         let stream = VideoStream(host: address ?? hostname, port: port, gateway: gateway,
-                                 bitrateKbps: PictureQuality.current.videoBitrateKbps, fps: 60)
+                                 bitrateKbps: PictureQuality.current.videoBitrateKbps, fps: 60,
+                                 sound: Self.soundEnabled, autoQuality: Self.autoQualityEnabled)
         stream.onEvent = { [weak self, weak stream] event in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
@@ -279,14 +286,17 @@ final class VNCSession {
             videoNotice = text
         case .log(let line):
             note("video: \(line)")
-        case .stats(let fps, let skipped, let kbps, let roundTripMs):
+        case .stats(let stats):
+            videoStats = stats
             // One line every few seconds is enough to see how the link is doing.
             videoStatsCount += 1
             if videoStatsCount % 5 == 1 {
-                note("video: \(fps) fps, \(kbps / 1000) Mbps, \(skipped) skipped, round trip \(roundTripMs) ms")
+                let cap = stats.capKbps.map { ", cap \($0 / 1000) Mbps" } ?? ""
+                note("video: \(stats.fps) fps, \(stats.kbps / 1000) Mbps\(cap), \(stats.skipped) skipped, round trip \(stats.roundTripMs) ms (best \(stats.bestRoundTripMs))")
             }
         case .closed(let failure):
             video = nil
+            videoStats = nil
             if userDisconnecting { status = .disconnected(nil); return }
             note("video: closed \(failure.map { "\($0)" } ?? "")")
             switch failure {
@@ -562,6 +572,11 @@ final class VNCSession {
         connection?.updateQuality(jpegQuality: quality.jpegQuality, compressionLevel: quality.compressionLevel)
         video?.setBitrate(kbps: quality.videoBitrateKbps)
         note("picture quality: \(quality.rawValue)")
+    }
+
+    /// Sound and automatic quality, from Settings / the ••• menu, to the PC now.
+    func applyVideoOptions() {
+        video?.setOptions(sound: Self.soundEnabled, autoQuality: Self.autoQualityEnabled)
     }
 
     // MARK: View commands

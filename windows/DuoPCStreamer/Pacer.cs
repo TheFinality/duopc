@@ -19,6 +19,8 @@ public sealed class Pacer
     // Stats since the last report.
     int _sent, _skipped;
     long _bytes;
+    double _rttSum;
+    int _rttCount;
     long _lastReport = Environment.TickCount64;
 
     static readonly TimeSpan RttWindow = TimeSpan.FromSeconds(10);
@@ -84,15 +86,17 @@ public sealed class Pacer
         lock (_lock) _inFlight.Clear();
     }
 
-    /// Stats once a second: (frames sent, frames skipped, kbps, best round trip ms), or null if not due.
-    public (int Fps, int Skipped, int Kbps, int RttMs)? Report(long nowTicks)
+    /// Stats once a second: frames sent, frames skipped, kbps, the best round trip (ms, last 10 s) and
+    /// the average one this second (how much is queued), or null if not due.
+    public (int Fps, int Skipped, int Kbps, int RttMs, int RecentRttMs)? Report(long nowTicks)
     {
         lock (_lock)
         {
             var elapsed = nowTicks - _lastReport;
             if (elapsed < 1000) return null;
-            var result = ((int)(_sent * 1000 / elapsed), _skipped, (int)(_bytes * 8 / elapsed), (int)MinRttMs);
-            _sent = 0; _skipped = 0; _bytes = 0; _lastReport = nowTicks;
+            var recent = _rttCount > 0 ? _rttSum / _rttCount : MinRttMs;
+            var result = ((int)(_sent * 1000 / elapsed), _skipped, (int)(_bytes * 8 / elapsed), (int)MinRttMs, (int)recent);
+            _sent = 0; _skipped = 0; _bytes = 0; _rttSum = 0; _rttCount = 0; _lastReport = nowTicks;
             return result;
         }
     }
@@ -102,6 +106,8 @@ public sealed class Pacer
 
     void AddRtt(long rttMs, long nowTicks)
     {
+        _rttSum += rttMs;
+        _rttCount++;
         _rttSamples.Enqueue((nowTicks, rttMs));
         while (_rttSamples.Count > 0 && nowTicks - _rttSamples.Peek().Ticks > RttWindow.TotalMilliseconds) _rttSamples.Dequeue();
     }

@@ -1,4 +1,5 @@
 ﻿using System.Buffers.Binary;
+using System.ComponentModel;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -54,6 +55,10 @@ var writeLock = new SemaphoreSlim(1, 1);
 var pacer = new Pacer();
 var bitrateKbps = 20_000;
 var fps = 60;
+var autoBitrate = new AutoBitrate(bitrateKbps);
+var autoQuality = false;
+var soundOn = false;
+CancellationTokenSource? soundStop = null;
 VideoEncoder? encoder = null;
 Task? encoderLoop = null;
 // For the capture watchdog: when FFmpeg last produced a frame.
@@ -101,8 +106,14 @@ async Task RunEncoderAsync(CancellationToken stop)
                     var decision = pacer.Decide(keyframe, now);
                     if (decision == Pacer.Decision.Restart)
                     {
-                        // Frames were skipped: start over from a fresh keyframe of the current screen.
+                        // Frames were skipped: start over from a fresh keyframe of the current screen,
+                        // at a bitrate the network can carry if automatic quality is on.
                         log.Info("network caught up after skipping frames: restarting for a clean picture");
+                        if (autoQuality && autoBitrate.Congested(now) is { } lower)
+                        {
+                            bitrateKbps = lower;
+                            log.Info($"automatic quality: down to {lower} kbps");
+                        }
                         RestartEncoder();
                         return;
                     }
@@ -118,12 +129,20 @@ async Task RunEncoderAsync(CancellationToken stop)
                     }
                     if (pacer.Report(now) is { } stats)
                     {
-                        var report = new byte[10];
+                        var report = new byte[16];
                         BinaryPrimitives.WriteUInt16LittleEndian(report, (ushort)stats.Fps);
                         BinaryPrimitives.WriteUInt16LittleEndian(report.AsSpan(2), (ushort)Math.Min(stats.Skipped, ushort.MaxValue));
                         BinaryPrimitives.WriteUInt32LittleEndian(report.AsSpan(4), (uint)stats.Kbps);
                         BinaryPrimitives.WriteUInt16LittleEndian(report.AsSpan(8), (ushort)Math.Min(stats.RttMs, ushort.MaxValue));
+                        BinaryPrimitives.WriteUInt16LittleEndian(report.AsSpan(10), (ushort)Math.Min(stats.RecentRttMs, ushort.MaxValue));
+                        BinaryPrimitives.WriteUInt32LittleEndian(report.AsSpan(12), (uint)bitrateKbps);
                         await SendAsync(StreamProtocol.Stats, report);
+                        if (autoQuality && stats.Skipped == 0 && autoBitrate.Clear(now) is { } higher)
+                        {
+                            bitrateKbps = higher;
+                            log.Info($"automatic quality: back up to {higher} kbps");
+                            RestartEncoder();
+                        }
                     }
                 },
                 fps, stop);
@@ -153,6 +172,44 @@ void RestartEncoder()
     encoderLoop = Task.Run(() => RunEncoderAsync(token));
 }
 
+// The PC's sound, while the phone wants it: WASAPI loopback → AAC. If the PC has no output device
+// or it goes away, try again every few seconds.
+async Task RunSoundAsync(CancellationToken stop)
+{
+    while (!stop.IsCancellationRequested)
+    {
+        try
+        {
+            AudioEncoder? sink = null;
+            using var capture = new AudioCapture(samples => sink?.Write(samples), log);
+            using var encoder = new AudioEncoder(ffmpeg, capture.SampleFormat, capture.SampleRate, capture.Channels, log);
+            sink = encoder;
+            capture.Start();
+            log.Info($"sound: {capture.SampleRate} Hz, {capture.Channels} channels ({capture.SampleFormat})");
+            await encoder.RunAsync(frame => SendAsync(StreamProtocol.Audio, frame), stop);
+        }
+        catch (OperationCanceledException) { return; }
+        catch (Exception e) when (e is System.Runtime.InteropServices.COMException or IOException or InvalidDataException
+                                       or NotSupportedException or InvalidOperationException or Win32Exception)
+        {
+            log.Info($"sound: {e.Message}");
+        }
+        await Task.Delay(3000, stop).ContinueWith(_ => { });
+    }
+}
+
+void SetSound(bool on)
+{
+    if (on == soundOn) return;
+    soundOn = on;
+    soundStop?.Cancel();
+    soundStop = null;
+    if (!on) return;
+    soundStop = CancellationTokenSource.CreateLinkedTokenSource(cancel.Token);
+    var token = soundStop.Token;
+    _ = Task.Run(() => RunSoundAsync(token));
+}
+
 // Capture watchdog: frames come continuously (repeated on a still screen), so two seconds without
 // one means the capture has stalled: restart it.
 _ = Task.Run(async () =>
@@ -178,12 +235,24 @@ try
         {
             case StreamProtocol.Start when p.Length >= 6:
                 bitrateKbps = Math.Clamp((int)BinaryPrimitives.ReadUInt32LittleEndian(p), 1_000, 150_000);
+                autoBitrate.Reset(bitrateKbps);
                 fps = Math.Clamp((int)BinaryPrimitives.ReadUInt16LittleEndian(p.AsSpan(4)), 10, 120);
                 RestartEncoder();
                 break;
             case StreamProtocol.SetBitrate when p.Length >= 4:
                 bitrateKbps = Math.Clamp((int)BinaryPrimitives.ReadUInt32LittleEndian(p), 1_000, 150_000);
+                autoBitrate.Reset(bitrateKbps);
                 RestartEncoder();
+                break;
+            case StreamProtocol.Options when p.Length >= 1:
+                autoQuality = (p[0] & StreamProtocol.OptionAutoQuality) != 0;
+                if (!autoQuality && bitrateKbps != autoBitrate.CeilingKbps)
+                {
+                    bitrateKbps = autoBitrate.CeilingKbps;
+                    autoBitrate.Reset(bitrateKbps);
+                    if (encoderStop is not null) RestartEncoder();
+                }
+                SetSound((p[0] & StreamProtocol.OptionSound) != 0);
                 break;
             case StreamProtocol.PointerMove when p.Length >= 8:
                 var x = BinaryPrimitives.ReadInt32LittleEndian(p);
@@ -226,6 +295,7 @@ finally
 {
     cancel.Cancel();
     encoder?.Dispose();
+    soundStop?.Cancel();
     client.Dispose();
     log.Info("ended");
 }

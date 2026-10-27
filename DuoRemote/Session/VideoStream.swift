@@ -27,8 +27,41 @@ extension RemoteLink {
     }
 }
 
+/// Once a second from the PC (Stats): how the video link is doing.
+nonisolated struct VideoStats: Equatable, Sendable {
+    var fps: Int
+    /// Frames the PC skipped this second to keep the delay down.
+    var skipped: Int
+    var kbps: Int
+    /// The best round trip of the last 10 s (the network's own delay) and this second's average
+    /// (what's queued on top of it).
+    var bestRoundTripMs: Int
+    var roundTripMs: Int
+    /// The bitrate cap the PC is using: below the chosen quality while automatic quality has
+    /// lowered it. Nil from an older PC.
+    var capKbps: Int?
+
+    /// The network is backing up: frames are being skipped, or video is queueing.
+    var isStrained: Bool { skipped > 0 || roundTripMs > bestRoundTripMs + 80 }
+
+    init(fps: Int, skipped: Int, kbps: Int, bestRoundTripMs: Int, roundTripMs: Int, capKbps: Int?) {
+        (self.fps, self.skipped, self.kbps) = (fps, skipped, kbps)
+        (self.bestRoundTripMs, self.roundTripMs, self.capKbps) = (bestRoundTripMs, roundTripMs, capKbps)
+    }
+
+    /// The Stats payload; older PCs send only the first four fields.
+    init?(payload p: Data) {
+        guard p.count >= 10 else { return nil }
+        let best = Int(p.readLE(UInt16.self, at: 8))
+        self.init(fps: Int(p.readLE(UInt16.self, at: 0)), skipped: Int(p.readLE(UInt16.self, at: 2)),
+                  kbps: Int(p.readLE(UInt32.self, at: 4)), bestRoundTripMs: best,
+                  roundTripMs: p.count >= 12 ? Int(p.readLE(UInt16.self, at: 10)) : best,
+                  capKbps: p.count >= 16 ? Int(p.readLE(UInt32.self, at: 12)) : nil)
+    }
+}
+
 /// DuoPC's video channel through DuoPC Gateway: the PC's screen as HEVC from its GPU encoder, decoded
-/// by the phone's hardware; pointer and keys go back the same way. The wire format is in
+/// by the phone's hardware, and its sound as AAC; pointer and keys go back the same way. The wire format is in
 /// windows/DuoPCStreamer/Protocol.cs. Everything runs on the stream's own queue; events come out
 /// through `onEvent`.
 nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
@@ -42,8 +75,7 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
         case frame(SurfaceBox)
         /// A notice from the PC (e.g. the screen can't be captured right now).
         case notice(String)
-        /// Once a second from the PC: frames sent, frames skipped to keep the delay down, kbps, best round trip.
-        case stats(fps: Int, skipped: Int, kbps: Int, roundTripMs: Int)
+        case stats(VideoStats)
         /// Something worth a line in the connection log (decoder trouble and recovery).
         case log(String)
         case closed(Failure?)
@@ -57,6 +89,9 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
     private let pinMismatch = OSAllocatedUnfairLock(initialState: false)
     private var bitrateKbps: Int
     private let fps: Int
+    /// Options flags (Protocol.cs): 1 = sound, 2 = automatic quality.
+    private var options: UInt8
+    private var sound: PCSoundPlayer?
     // Queue-confined.
     private var decoder: HEVCDecoder?
     /// The last Config, to rebuild the decoder from.
@@ -65,10 +100,11 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
     private var finished = false
     private var closing = false
 
-    init(host: String, port: UInt16, gateway: VNCGatewaySettings, bitrateKbps: Int, fps: Int) {
+    init(host: String, port: UInt16, gateway: VNCGatewaySettings, bitrateKbps: Int, fps: Int, sound: Bool, autoQuality: Bool) {
         token = gateway.token
         self.bitrateKbps = bitrateKbps
         self.fps = fps
+        options = Self.options(sound: sound, autoQuality: autoQuality)
         let tcp = NWProtocolTCP.Options()
         tcp.noDelay = true
         tcp.connectionTimeout = 15
@@ -132,6 +168,20 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
         send(0x18, Data())
     }
 
+    /// Turns the PC's sound and automatic quality on or off.
+    func setOptions(sound: Bool, autoQuality: Bool) {
+        let flags = Self.options(sound: sound, autoQuality: autoQuality)
+        queue.async { [self] in
+            options = flags
+            if !sound { self.sound = nil }
+        }
+        send(0x19, Data([flags]))
+    }
+
+    private static func options(sound: Bool, autoQuality: Bool) -> UInt8 {
+        (sound ? 1 : 0) | (autoQuality ? 2 : 0)
+    }
+
     /// Asks the PC to restart its encoder at this bitrate.
     func setBitrate(kbps: Int) {
         queue.async { [self] in bitrateKbps = kbps }
@@ -171,6 +221,7 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
             receive(1) { [self] reply in
                 switch reply.first {
                 case 0x00:
+                    send(0x19, Data([options]))
                     var start = Data()
                     start.appendLE(UInt32(bitrateKbps)); start.appendLE(UInt16(fps))
                     send(0x10, start)
@@ -226,9 +277,14 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
             onEvent?(.frame(SurfaceBox(surface: surface, size: size, owner: pixels)))
         case 0x03 where !payload.isEmpty:     // Status: u8 code, text
             onEvent?(.notice(String(decoding: payload.dropFirst(), as: UTF8.self)))
-        case 0x05 where payload.count >= 10:  // Stats: u16 fps, u16 skipped, u32 kbps, u16 round trip ms
-            onEvent?(.stats(fps: Int(payload.readLE(UInt16.self, at: 0)), skipped: Int(payload.readLE(UInt16.self, at: 2)),
-                            kbps: Int(payload.readLE(UInt32.self, at: 4)), roundTripMs: Int(payload.readLE(UInt16.self, at: 8))))
+        case 0x05:                            // Stats
+            if let stats = VideoStats(payload: payload) { onEvent?(.stats(stats)) }
+        case 0x06 where options & 1 != 0:     // Audio: one ADTS frame
+            if sound == nil {
+                sound = PCSoundPlayer()
+                if sound == nil { onEvent?(.log("couldn't start playing the PC's sound")) }
+            }
+            sound?.play(adts: payload)
         default:
             break
         }
@@ -261,6 +317,7 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
         guard !finished else { return }
         finished = true
         decoder = nil
+        sound = nil
         connection.cancel()
         onEvent?(.closed(closing ? nil : failure))
     }

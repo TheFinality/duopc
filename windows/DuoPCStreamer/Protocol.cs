@@ -14,17 +14,22 @@ namespace DuoPCStreamer;
 ///   SetBitrate   0x16  u32 kbps                (restarts the encoder)
 ///   FrameAck     0x17  u64 time                (of a frame the phone has decoded; see Pacer)
 ///   Keyframe     0x18  (empty)                 (restart the encoder: a fresh picture)
+///   Options      0x19  u8 flags: 1 = send the PC's sound, 2 = automatic quality (lower the bitrate
+///                      when the network can't keep up). Sent before Start, and whenever they change.
 /// PC → phone:
 ///   Config       0x01  u32 width, u32 height, u16 fps, u8 codec (1 = HEVC), hvcC record
 ///   Frame        0x02  u8 flags (1 = keyframe), u64 time µs, sample (length-prefixed NAL units)
 ///   Status       0x03  u8 code, UTF-8 message
 ///   Clipboard    0x04  UTF-8
-///   Stats        0x05  u16 frames/s sent, u16 frames skipped, u32 kbps, u16 best round trip ms (once a second)
+///   Stats        0x05  u16 frames/s sent, u16 frames skipped, u32 kbps, u16 best round trip ms,
+///                      u16 average round trip ms this second, u32 bitrate cap kbps (once a second)
+///   Audio        0x06  one ADTS frame (AAC-LC, 48 kHz stereo)
 public static class StreamProtocol
 {
-    public const byte Start = 0x10, PointerMove = 0x11, Button = 0x12, Scroll = 0x13, Key = 0x14, Text = 0x15, SetBitrate = 0x16, FrameAck = 0x17, Keyframe = 0x18;
-    public const byte Config = 0x01, Frame = 0x02, Status = 0x03, Clipboard = 0x04, Stats = 0x05;
+    public const byte Start = 0x10, PointerMove = 0x11, Button = 0x12, Scroll = 0x13, Key = 0x14, Text = 0x15, SetBitrate = 0x16, FrameAck = 0x17, Keyframe = 0x18, Options = 0x19;
+    public const byte Config = 0x01, Frame = 0x02, Status = 0x03, Clipboard = 0x04, Stats = 0x05, Audio = 0x06;
     public const byte CodecHevc = 1;
+    public const byte OptionSound = 1, OptionAutoQuality = 2;
     public const byte StatusCaptureUnavailable = 1, StatusEncoderFailed = 2;
     public const int MaxMessage = 64 * 1024 * 1024;
 

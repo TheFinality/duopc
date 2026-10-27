@@ -12,6 +12,9 @@ struct SessionMenu: View {
     @AppStorage("hasSeenCopyTextIntro") private var hasSeenCopyIntro = false
     @AppStorage("autoCompose") private var autoCompose = true
     @AppStorage(PictureQuality.storageKey) private var pictureQuality: PictureQuality = .balanced
+    @AppStorage("pcSound") private var pcSound = true
+    @AppStorage("autoQuality") private var autoQuality = true
+    @AppStorage("showConnectionInfo") private var showConnectionInfo = false
 
     private func openCopyText() {
         if let img = session.visibleSnapshot() { liveText = LiveTextImage(image: img) }
@@ -37,6 +40,13 @@ struct SessionMenu: View {
                 Label("Picture quality", systemImage: "photo")
             }
             .pickerStyle(.menu)
+            if session.isVideo {
+                Section {
+                    Toggle(isOn: $pcSound) { Label("PC sound", systemImage: "speaker.wave.2") }
+                    Toggle(isOn: $autoQuality) { Label("Automatic quality", systemImage: "wand.and.sparkles") }
+                    Toggle(isOn: $showConnectionInfo) { Label("Connection info", systemImage: "gauge.with.dots.needle.33percent") }
+                }
+            }
             Section {
                 if session.isVideo {
                     Button("Refresh picture", systemImage: "arrow.clockwise") { session.refreshVideo() }
@@ -67,6 +77,8 @@ struct SessionMenu: View {
                 .frame(minWidth: 36, minHeight: 36)
         }
         .onChange(of: pictureQuality) { _, quality in session.applyPictureQuality(quality) }
+        .onChange(of: pcSound) { session.applyVideoOptions() }
+        .onChange(of: autoQuality) { session.applyVideoOptions() }
         .sheet(isPresented: $showLog) { ConnectionLogView(session: session) }
         .sheet(isPresented: $showScrollSpeed) { ScrollSpeedSheet(session: session, coordinator: coordinator) }
         .fullScreenCover(item: $liveText) { LiveTextSheet(image: $0.image) }

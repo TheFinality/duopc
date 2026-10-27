@@ -137,5 +137,31 @@ struct StreamWireTests {
         let slice = whole[2...]                       // startIndex 2
         #expect(slice.readLE(UInt32.self, at: 0) == 0x2A)
     }
+
+    @Test func statsFromOlderAndNewerPCs() throws {
+        var old = Data()
+        old.appendLE(UInt16(60)); old.appendLE(UInt16(0)); old.appendLE(UInt32(4_200)); old.appendLE(UInt16(25))
+        let a = try #require(VideoStats(payload: old))
+        #expect(a == VideoStats(fps: 60, skipped: 0, kbps: 4_200, bestRoundTripMs: 25, roundTripMs: 25, capKbps: nil))
+        #expect(!a.isStrained)
+
+        var new = old
+        new.appendLE(UInt16(140)); new.appendLE(UInt32(12_000))
+        let b = try #require(VideoStats(payload: new))
+        #expect(b.roundTripMs == 140 && b.capKbps == 12_000)
+        #expect(b.isStrained)                          // 115 ms queued on top of the best round trip
+        #expect(VideoStats(payload: Data([1, 2, 3])) == nil)
+    }
+
+    @Test func adtsHeaderGivesTheDecoderItsConfig() throws {
+        // AAC-LC, 48 kHz, stereo, 10-byte frame (7-byte header, no CRC) with a 3-byte payload.
+        let frame = Data([0xFF, 0xF1, 0x4C, 0x80, 0x01, 0x5F, 0xFC, 0xAA, 0xBB, 0xCC])
+        let adts = try #require(ADTSFrame(frame))
+        #expect(adts.objectType == 2 && adts.sampleRate == 48_000 && adts.channels == 2)
+        #expect(adts.payload == Data([0xAA, 0xBB, 0xCC]))
+        #expect(adts.audioSpecificConfig == Data([0x11, 0x90]))
+        #expect(ADTSFrame(frame.prefix(8)) == nil)     // shorter than its header says
+        #expect(ADTSFrame(Data([0x00] + frame.dropFirst())) == nil)
+    }
 }
 

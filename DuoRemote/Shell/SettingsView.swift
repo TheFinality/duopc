@@ -7,6 +7,9 @@ struct SettingsView: View {
     @AppStorage("scrollSpeed") private var scrollSpeed = VNCSession.defaultScrollSpeed
     @AppStorage("invertScroll") private var invertScroll = false
     @AppStorage(PictureQuality.storageKey) private var pictureQuality: PictureQuality = .balanced
+    @AppStorage("pcSound") private var pcSound = true
+    @AppStorage("autoQuality") private var autoQuality = true
+    @AppStorage("showConnectionInfo") private var showConnectionInfo = false
     @AppStorage("keyHaptics") private var keyHaptics = true
     @AppStorage("laptopScreenClicks") private var laptopScreenClicks = false
     @AppStorage("autoCompose") private var autoCompose = true
@@ -64,10 +67,13 @@ struct SettingsView: View {
                     Picker("Picture quality", selection: $pictureQuality) {
                         ForEach(PictureQuality.allCases) { Text($0.title).tag($0) }
                     }
+                    Toggle("Automatic quality", isOn: $autoQuality)
+                    Toggle("PC sound", isOn: $pcSound)
+                    Toggle("Connection info", isOn: $showConnectionInfo)
                 } header: {
                     Text("Screen")
                 } footer: {
-                    Text("Fast sends a softer picture while things move, which keeps up better over mobile data or a slow home upload. Text sharpens once it stops changing. You can also switch while connected: ••• → Picture quality.")
+                    Text("Fast sends a softer picture while things move, which keeps up better over mobile data or a slow home upload. Text sharpens once it stops changing. With video streaming, automatic quality lowers it for you while the network can't keep up and brings it back after; PC sound plays what the PC is playing; connection info shows the delay, frame rate and data rate in a corner, amber while the network is backing up. You can also switch these while connected, in the ••• menu.")
                 }
 
                 Section("Privacy") {
