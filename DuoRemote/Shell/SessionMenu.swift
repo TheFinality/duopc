@@ -15,6 +15,8 @@ struct SessionMenu: View {
     @AppStorage("pcSound") private var pcSound = true
     @AppStorage("autoQuality") private var autoQuality = true
     @AppStorage("showConnectionInfo") private var showConnectionInfo = false
+    @AppStorage(OuterPicture.enabledKey) private var outerPicture = false
+    @AppStorage(OuterPicture.versionKey) private var outerPictureVersion = 0
 
     private func openCopyText() {
         if let img = session.visibleSnapshot() { liveText = LiveTextImage(image: img) }
@@ -46,6 +48,9 @@ struct SessionMenu: View {
                     Toggle(isOn: $autoQuality) { Label("Automatic quality", systemImage: "wand.and.sparkles") }
                     Toggle(isOn: $showConnectionInfo) { Label("Connection info", systemImage: "gauge.with.dots.needle.33percent") }
                 }
+            }
+            if outerPictureVersion > 0 {
+                Toggle(isOn: $outerPicture) { Label("Picture on the outer screen", systemImage: "photo.on.rectangle") }
             }
             Section {
                 if session.isVideo {

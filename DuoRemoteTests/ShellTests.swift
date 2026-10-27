@@ -2,6 +2,7 @@ import Testing
 import CoreGraphics
 import Foundation
 import IOSurface
+import UIKit
 @testable import DuoRemote
 
 struct ShellTests {
@@ -118,6 +119,27 @@ struct FramePresenterTests {
         presenter.present()
         #expect(pixel(front, 9, 5) == 9)
         #expect(pixel(front, 40, 20) == 1)
+    }
+}
+
+struct OuterPictureTests {
+    @Test func cameraRunsOnlyWhileThePictureCanShow() {
+        #expect(OuterPicture.cameraShouldRun(enabled: true, hasPicture: true, unfolded: true, active: true))
+        #expect(!OuterPicture.cameraShouldRun(enabled: false, hasPicture: true, unfolded: true, active: true))
+        #expect(!OuterPicture.cameraShouldRun(enabled: true, hasPicture: false, unfolded: true, active: true))
+        #expect(!OuterPicture.cameraShouldRun(enabled: true, hasPicture: true, unfolded: false, active: true))
+        #expect(!OuterPicture.cameraShouldRun(enabled: true, hasPicture: true, unfolded: true, active: false))
+    }
+
+    @Test func bigPhotosAreShrunkToAJPEG() throws {
+        let photo = UIGraphicsImageRenderer(size: CGSize(width: 4000, height: 3000),
+                                            format: { let f = UIGraphicsImageRendererFormat(); f.scale = 1; return f }())
+            .pngData { $0.fill(CGRect(x: 0, y: 0, width: 4000, height: 3000)) }
+        let jpeg = try #require(OuterPicture.prepare(photo, maxPixels: 1000))
+        let image = try #require(UIImage(data: jpeg))
+        #expect(image.size == CGSize(width: 1000, height: 750))
+        #expect(jpeg.prefix(2) == Data([0xFF, 0xD8]))
+        #expect(OuterPicture.prepare(Data("not a picture".utf8)) == nil)
     }
 }
 

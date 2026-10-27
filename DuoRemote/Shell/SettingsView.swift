@@ -1,3 +1,5 @@
+import AVFoundation
+import PhotosUI
 import SwiftUI
 
 /// App settings. Values live in UserDefaults; sessions read them when they start.
@@ -76,6 +78,8 @@ struct SettingsView: View {
                     Text("Fast sends a softer picture while things move, which keeps up better over mobile data or a slow home upload. Text sharpens once it stops changing. With video streaming, automatic quality lowers it for you while the network can't keep up and brings it back after; PC sound plays what the PC is playing; connection info shows the delay, frame rate and data rate in a corner, amber while the network is backing up. You can also switch these while connected, in the ••• menu.")
                 }
 
+                OuterPictureSection()
+
                 Section("Privacy") {
                     Label("Passwords stay in this \(AppInfo.device)'s Keychain.", systemImage: "key.fill")
                     Label("Connections go straight to your PCs.", systemImage: "arrow.left.arrow.right")
@@ -93,6 +97,75 @@ struct SettingsView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done", systemImage: "checkmark") { dismiss() }
                 }
+            }
+        }
+    }
+}
+
+/// Choose the picture for the outer screen, and turn it on and off.
+private struct OuterPictureSection: View {
+    @AppStorage(OuterPicture.enabledKey) private var enabled = false
+    @AppStorage(OuterPicture.versionKey) private var version = 0
+    @State private var picked: PhotosPickerItem?
+    @State private var thumbnail: UIImage?
+    @State private var cameraDenied = AVCaptureDevice.authorizationStatus(for: .video) == .denied
+    @State private var failed = false
+
+    var body: some View {
+        Section {
+            Toggle("Picture on the outer screen", isOn: $enabled)
+                .disabled(version == 0)
+            PhotosPicker(selection: $picked, matching: .images) {
+                Label(version == 0 ? "Choose picture" : "Change picture", systemImage: "photo.on.rectangle")
+            }
+            if let thumbnail {
+                HStack {
+                    Image(uiImage: thumbnail)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 96)
+                        .clipShape(.rect(cornerRadius: 8))
+                    Spacer()
+                    Button("Remove", role: .destructive) {
+                        OuterPicture.remove()
+                        enabled = false
+                        version = 0
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+        } header: {
+            Text("Outer screen")
+        } footer: {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("While you're connected with the phone unfolded, the outer screen (the back of the lid in laptop pose) shows this picture. iOS only allows that while the camera is on, so the camera runs at its lowest setting and the green camera dot shows; nothing it sees is kept or sent. It uses a little more battery.")
+                if cameraDenied {
+                    Text("Camera access is off for DuoPC: turn it on in Settings → Privacy & Security → Camera.")
+                        .foregroundStyle(.orange)
+                }
+                if failed {
+                    Text("That picture couldn't be read. Try another.").foregroundStyle(.orange)
+                }
+            }
+        }
+        .task(id: version) { thumbnail = version > 0 ? OuterPicture.load() : nil }
+        .onChange(of: enabled) { _, on in
+            guard on else { return }
+            Task {
+                let granted = await AVCaptureDevice.requestAccess(for: .video)
+                cameraDenied = !granted
+            }
+        }
+        .onChange(of: picked) { _, item in
+            guard let item else { return }
+            Task {
+                picked = nil
+                let data = try? await item.loadTransferable(type: Data.self)
+                let jpeg = await Task.detached { data.flatMap { OuterPicture.prepare($0) } }.value
+                guard let jpeg, (try? OuterPicture.save(jpeg)) != nil else { failed = true; return }
+                failed = false
+                version += 1
+                enabled = true
             }
         }
     }

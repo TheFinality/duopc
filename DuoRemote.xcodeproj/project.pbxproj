@@ -62,6 +62,7 @@
 		D25D7D35594CDB95CFFDB45B /* DuoLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CC8AF303A7EF6DCC2379DE /* DuoLayout.swift */; };
 		D5212FB83ED304D6C535E9D2 /* AppInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40126972F4BF3D452A0250DF /* AppInfo.swift */; };
 		D5D89729D6C361467D74FDBC /* SessionScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20A1728FBA230FCE4C67774 /* SessionScreen.swift */; };
+		501540B0920BA58650E37866 /* OuterPicture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 073E571D90DB89D628808FC0 /* OuterPicture.swift */; };
 		D8DE93A901866C3107050962 /* CredentialPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30BBA3F7773DA5C895AD6212 /* CredentialPolicyTests.swift */; };
 		DF27857CF9921F4BB5BC5C60 /* FramebufferRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0BD64EA3A457B940C1F62B7 /* FramebufferRenderer.swift */; };
 		E9D70D4BCAC589073CCD4451 /* Host.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22880156ABF985A8B17CA4B4 /* Host.swift */; };
@@ -135,6 +136,7 @@
 		D6CBB498FB0A96812AC0800E /* DuoRemote.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = DuoRemote.xcconfig; sourceTree = "<group>"; };
 		D8575713052C4683C750BF12 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E20A1728FBA230FCE4C67774 /* SessionScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionScreen.swift; sourceTree = "<group>"; };
+		073E571D90DB89D628808FC0 /* OuterPicture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OuterPicture.swift; sourceTree = "<group>"; };
 		E31FBDC230056FD04FB2960F /* WelcomeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeSheet.swift; sourceTree = "<group>"; };
 		E74BAC53DF4F213A1D1F3ABA /* Viewport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Viewport.swift; sourceTree = "<group>"; };
 		EAF17A66F0EAC883506B428A /* RoyalVNCKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = RoyalVNCKit; path = Vendor/RoyalVNCKit; sourceTree = SOURCE_ROOT; };
@@ -288,6 +290,7 @@
 				A93A85EC4BC7C21C73429941 /* RootView.swift */,
 				C2AFD463E138D38470AC0979 /* SessionMenu.swift */,
 				E20A1728FBA230FCE4C67774 /* SessionScreen.swift */,
+				073E571D90DB89D628808FC0 /* OuterPicture.swift */,
 				08F7333573155702C13F6C08 /* SettingsView.swift */,
 				E31FBDC230056FD04FB2960F /* WelcomeSheet.swift */,
 			);
@@ -478,6 +481,7 @@
 				0A3BD9CFC295D08B38C801AB /* SessionCoordinator.swift in Sources */,
 				B8F05F1C5C0834FB4DCE9C1C /* SessionMenu.swift in Sources */,
 				D5D89729D6C361467D74FDBC /* SessionScreen.swift in Sources */,
+				501540B0920BA58650E37866 /* OuterPicture.swift in Sources */,
 				6764F79CCCE2A977765114AD /* SettingsView.swift in Sources */,
 				6020E7ACEC37D4B02FF3DB5C /* SkyLocation.swift in Sources */,
 				9AAC8D57A4A5572FB8936A5F /* SkyPalette.swift in Sources */,

@@ -111,6 +111,7 @@ struct SessionScreen: View {
                 if !shown { restoreDeckKeyboard() }
             }
             .animation(.spring(duration: 0.45, bounce: 0.15), value: laptopFold == nil)
+            .modifier(OuterPictureAccessory(unfolded: hingeHalfOpen || hingeFlat))
             .overlay { PasteBeamOverlay() }
             .overlay { FloatingChrome(session: session, coordinator: coordinator, barCollapsed: $barCollapsed) }
             .overlay(alignment: .bottom) {
