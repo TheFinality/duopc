@@ -142,7 +142,7 @@ public sealed class GatewayStore
                 File.WriteAllBytes(CertificatePath, created.Export(X509ContentType.Pfx));
             }
             // Schannel needs the key in a key store, not an ephemeral one.
-            return new X509Certificate2(CertificatePath, (string?)null, X509KeyStorageFlags.UserKeySet);
+            return X509CertificateLoader.LoadPkcs12FromFile(CertificatePath, null, X509KeyStorageFlags.UserKeySet);
         }
     }
 

@@ -32,8 +32,8 @@ the simulator. Never commit a team ID, a bundle ID or `Config/Local.xcconfig`.
 | `DuoRemoteTests/` | Swift Testing tests for the pure logic |
 | `Vendor/RoyalVNCKit/` | Vendored, patched RoyalVNCKit 1.1.0 |
 | `windows/` | `Setup-DuoPC.ps1` (Windows PowerShell 5.1): TightVNC locked to 127.0.0.1, plus the gateway service |
-| `windows/DuoPCGateway/` | The gateway (C#, .NET 8): TLS 1.3 + pairing tokens in front of TightVNC and the video channel. Never log tokens or passwords |
-| `windows/DuoPCStreamer/` | Video streaming (C#, .NET 8): FFmpeg ddagrab + hevc_nvenc out as AVI (one chunk per frame, no muxer delay), WASAPI loopback → AAC for sound, SendInput in. Started per connection by the gateway in the user's session |
+| `windows/DuoPCGateway/` | The gateway (C#, .NET 10): TLS 1.3 + pairing tokens in front of TightVNC and the video channel. Never log tokens or passwords |
+| `windows/DuoPCStreamer/` | Video streaming (C#, .NET 10): FFmpeg ddagrab + hevc_nvenc out as AVI (one chunk per frame, no muxer delay), WASAPI loopback → AAC for sound, SendInput in. Started per connection by the gateway in the user's session |
 | `DuoRemote/Session/VideoStream.swift` | The app's side of video: `RemoteLink` (input for VNC or video), `VideoStream`, `VideoStats`, `HEVCDecoder` (VideoToolbox → BGRA IOSurfaces); `PCSound.swift` plays the PC's sound |
 | `windows/tests/` | Gateway end-to-end test: `run-gateway-test.ps1` (loopback only, temporary data folder) |
 

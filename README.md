@@ -12,7 +12,7 @@ It connects **directly** to your PC, at home or away, over an encrypted connecti
 ```
 
 - **TightVNC** draws the screen and takes your input. It's set to accept connections only from the PC itself, so nothing on the network or internet can reach it directly.
-- **DuoPC Gateway** (in `windows/DuoPCGateway`, C#/.NET 8) is the only way in. It speaks TLS 1.3 with its own certificate, lets in only phones that scanned its pairing QR code, and passes their connection on to TightVNC.
+- **DuoPC Gateway** (in `windows/DuoPCGateway`, C#/.NET 10) is the only way in. It speaks TLS 1.3 with its own certificate, lets in only phones that scanned its pairing QR code, and passes their connection on to TightVNC.
 - **The app** trusts exactly one certificate per PC, the one it paired with, so a fake server can't stand in for your PC, even on hostile Wi-Fi.
 
 DuoPC is a fork of [DuoRemote](https://github.com/yezzer/DuoRemote) by Iestyn Lloyd-Wilkins, which does the same for a Mac.
@@ -32,7 +32,7 @@ Paired PCs stream the screen as **video** by default: your NVIDIA card encodes i
 
 ## Set up your PC (once)
 
-You need Windows 10 or 11, the [.NET 8 SDK](https://dotnet.microsoft.com/download) (to build the gateway), and this repository on the PC.
+You need Windows 10 or 11, the [.NET 10 SDK](https://dotnet.microsoft.com/download) (to build the gateway), and this repository on the PC.
 
 1. Open PowerShell **as administrator** (Start → type *PowerShell* → *Run as administrator*), then:
 
@@ -161,7 +161,7 @@ Everything else is DuoRemote: laptop pose, trackpad and direct touch, momentum s
 - **TightVNC can't be reached from the network.** It accepts connections only from 127.0.0.1 (TightVNC's *loopback only* setting plus its access list), and its port isn't opened in the firewall. Its random 8-character password is a second lock behind the gateway, not the main one.
 - **On the PC,** the certificate's private key, the token hashes and the VNC password (DPAPI-encrypted) are in `C:\ProgramData\DuoPC`, readable only by SYSTEM and Administrators. The gateway runs as a service, as SYSTEM.
 - **The pairing code is a secret.** It holds the token and the VNC password. It's shown on screen only; don't screenshot or share it. If it leaks, run `revoke` and pair again.
-- **Keep the gateway updated.** It's built on .NET 8, whose support ends on 10 November 2026. Before then, install the .NET 10 SDK, change `net8.0-windows` to `net10.0-windows` in `windows/DuoPCGateway/DuoPCGateway.csproj`, and run the setup script again to rebuild it. The rebuild keeps the certificate and pairings. Run Windows Update too: TLS is Windows' own (Schannel).
+- **Keep the gateway updated.** It's built on .NET 10 (supported until November 2028). After pulling a new version of DuoPC, run `.\Setup-DuoPC.ps1 -Update` as administrator to rebuild it; if you set it up on .NET 8, install the .NET 10 SDK first. The rebuild keeps the certificate and pairings. Run Windows Update too: TLS is Windows' own (Schannel).
 - **No accounts, analytics or servers.** The app talks only to the PCs you add. It reads the iPhone clipboard only when you tap Paste (iOS asks first), and text from the PC's clipboard stays on this iPhone and expires after 10 minutes.
 
 ### Without the gateway (Tailscale)

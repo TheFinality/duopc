@@ -13,7 +13,7 @@
          installs only the server, as a Windows service (so the lock screen and UAC prompts work too).
       2. Gives TightVNC a random password and makes it accept connections from this PC only
          (127.0.0.1). Nothing on the network can reach it directly.
-      3. Builds DuoPC Gateway from the source next to this script (needs the .NET 8 SDK), installs
+      3. Builds DuoPC Gateway from the source next to this script (needs the .NET 10 SDK), installs
          it to Program Files\DuoPC and runs it as a service on port 5960. It accepts only TLS 1.3
          connections from paired phones, and passes them on to TightVNC.
       4. Opens port 5960 in Windows Firewall for the gateway only, and closes any older VNC rules.
@@ -296,8 +296,8 @@ function Install-Gateway {
     Write-Step 'Building DuoPC Gateway'
     $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
     $sdks = if ($dotnet) { & dotnet --list-sdks 2>$null } else { @() }
-    if (-not ($sdks | Where-Object { $_ -match '^(\d+)\.' -and [int]$Matches[1] -ge 8 })) {
-        throw 'The .NET 8 SDK (or newer) is needed to build the gateway: https://dotnet.microsoft.com/download'
+    if (-not ($sdks | Where-Object { $_ -match '^(\d+)\.' -and [int]$Matches[1] -ge 10 })) {
+        throw 'The .NET 10 SDK (or newer) is needed to build the gateway: https://dotnet.microsoft.com/download'
     }
     if (-not (Test-Path $GatewayProject)) { throw "Can't find $GatewayProject. Run this script from the windows folder of the DuoPC repo." }
 
