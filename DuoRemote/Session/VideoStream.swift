@@ -234,8 +234,8 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
         }
     }
 
-    /// A frame didn't decode. A few in a row is normal right after skipped frames (the rolling
-    /// refresh repairs it); a run of them, or a dead decoder session (iOS can reset the hardware
+    /// A frame didn't decode. A few in a row is normal right after skipped frames (the PC then
+    /// restarts with a fresh keyframe); a run of them, or a dead decoder session (iOS can reset the hardware
     /// decoder), means rebuilding the decoder and asking for a keyframe.
     private func decodeFailed(status: OSStatus) {
         failedFrames += 1

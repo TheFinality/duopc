@@ -23,6 +23,7 @@ struct SessionScreen: View {
     /// Full window size from a keyboard-independent view (laptop pose is pinned to this).
     @State private var fullSize: CGSize = .zero
     @AppStorage("deckMode") private var deckMode: DeckMode = .trackpad
+    @AppStorage("laptopScreenClicks") private var laptopScreenClicks = false
 
     #if DEBUG
     private let forceLaptop = ProcessInfo.processInfo.arguments.contains("-laptopDemo")
@@ -180,8 +181,9 @@ struct SessionScreen: View {
         }
     }
 
-    /// Screen on the top half (same input mode as the normal layout — trackpad by default, since
-    /// half a screen is too small for direct touch), deck on the bottom half.
+    /// Screen on the top half, deck on the bottom half. The screen is look-only unless Settings
+    /// allows clicks there (then it uses the session's input mode): resting a hand on it while
+    /// typing shouldn't click.
     private func laptopLayout(fold f: CGRect) -> some View {
         // Pinned to the full window: a GeometryReader places its child at the window's origin,
         // and the explicit size never changes with the keyboard, so nothing can push it up.
@@ -201,7 +203,7 @@ struct SessionScreen: View {
         // screen and the keyboard) instead of taking height from the screen.
         let overhang = deckMode == .keyboard ? max((Self.stripHeight - f.height) / 2, 0) : 0
         return VStack(spacing: 0) {
-            RemoteCanvas(session: session)
+            RemoteCanvas(session: session, inputModeOverride: laptopScreenClicks ? nil : .view)
                 .frame(height: max(f.minY - overhang, 0))
             if deckMode == .keyboard {
                 LaptopKeyStrip(session: session)

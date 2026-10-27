@@ -8,6 +8,7 @@ struct SettingsView: View {
     @AppStorage("invertScroll") private var invertScroll = false
     @AppStorage(PictureQuality.storageKey) private var pictureQuality: PictureQuality = .balanced
     @AppStorage("keyHaptics") private var keyHaptics = true
+    @AppStorage("laptopScreenClicks") private var laptopScreenClicks = false
     @AppStorage("autoCompose") private var autoCompose = true
     @AppStorage("effectsEnabled") private var effectsEnabled = true
     @AppStorage("skyTheme") private var skyTheme = true
@@ -50,12 +51,13 @@ struct SettingsView: View {
                         Text("Used for new connections. Each PC can have its own speed: ••• → Scroll speed while connected.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
+                    Toggle("Click on the screen in laptop pose", isOn: $laptopScreenClicks)
                     Toggle("Open the text box when you click into text", isOn: $autoCompose)
                     Toggle("Haptic feedback when typing", isOn: $keyHaptics)
                 } header: {
                     Text("Controls")
                 } footer: {
-                    Text("Natural scrolling moves content with your finger. Changes apply to the next connection. Typing haptics are a light tap per key on the keyboard; if you also feel iOS's own keyboard haptics (Settings → Sounds & Haptics → Keyboard Feedback), turn one of them off.")
+                    Text("Natural scrolling moves content with your finger. Changes apply to the next connection. In laptop pose the screen half is for looking: drag to move around when zoomed in, pinch to zoom, two fingers to scroll. Turn on clicking there to use it like the trackpad (or direct touch). Typing haptics are a firm tap per key on the keyboard; if you also feel iOS's own keyboard haptics (Settings → Sounds & Haptics → Keyboard Feedback), turn one of them off.")
                 }
 
                 Section {

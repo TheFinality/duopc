@@ -132,6 +132,7 @@ The GitHub Actions workflow (`.github/workflows/build.yml`) builds the app and r
 - **Windows shortcuts** in the ••• menu: Ctrl+Alt+Del, Task Manager, Start menu, Task view, Show desktop, File Explorer.
 - **Clipboard PC → iPhone.** Copy on the PC (Ctrl+C) and it's on your iPhone for 10 minutes. *Paste to PC* types your iPhone clipboard into the PC. *Copy text from screen* (Live Text) is still there for text you can't select.
 - **Scroll speed retuned for Windows**, which scrolls 3 lines per wheel step.
+- **Look-only screen in laptop pose.** A hand resting on the screen half doesn't click: drag there to move around when zoomed in, pinch to zoom, two fingers to scroll. Settings → *Click on the screen in laptop pose* turns clicking back on.
 
 Everything else is DuoRemote: laptop pose, trackpad and direct touch, momentum scrolling, pinch zoom, the text box with dictation, auto-reconnect, Keychain storage.
 

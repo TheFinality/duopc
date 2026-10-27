@@ -308,7 +308,7 @@ private struct DeckKey<Label: View>: View {
                     repeater.end()
                 })
             .onDisappear { repeater.end() }
-            .sensoryFeedback(.impact(weight: .light), trigger: pressed) { _, new in new }
+            .sensoryFeedback(.impact(weight: .medium), trigger: pressed) { _, new in new }
     }
 }
 
@@ -357,7 +357,7 @@ private struct DeckClickZone: View {
                     down = false
                     session.buttonUp(button)
                 })
-            .sensoryFeedback(.impact(weight: .medium), trigger: down)
+            .sensoryFeedback(.impact(weight: .heavy), trigger: down) { _, new in new }
             .accessibilityLabel(title)
     }
 }

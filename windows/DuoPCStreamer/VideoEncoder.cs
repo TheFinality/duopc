@@ -6,10 +6,9 @@ namespace DuoPCStreamer;
 
 public sealed record VideoConfig(int Width, int Height, int Fps, byte[] HvcC);
 
-/// Captures the desktop (Desktop Duplication) and encodes it to HEVC with FFmpeg, out as fragmented
-/// MP4 with one fragment per frame. Each fragment's mdat is exactly one frame of length-prefixed NAL
-/// units, ready for VideoToolbox, and it's written the moment the frame is encoded (no waiting for
-/// the next frame to find the boundary).
+/// Captures the desktop (Desktop Duplication) and encodes it to HEVC with FFmpeg, out as AVI: each
+/// frame is one chunk with its size up front, written the moment it's encoded. (Fragmented MP4 holds
+/// every frame back until the next one exists, since it needs the frame's duration: a frame of delay.)
 public sealed class VideoEncoder : IDisposable
 {
     readonly Process _process;
@@ -27,10 +26,8 @@ public sealed class VideoEncoder : IDisposable
     public static string[] Arguments(int bitrateKbps, int fps, bool software)
     {
         // No pointer in the video: the app draws its own, which moves the instant the finger does.
-        // Frames keep coming on a still screen (dup_frames): MP4 writes a frame only once the next
-        // one arrives (it needs its duration), so without them the last frame of every change would
-        // wait for the next change: a stale picture. Repeated frames cost a few hundred bytes each,
-        // and double as a heartbeat for the stall watchdog.
+        // Frames keep coming on a still screen (dup_frames): a few hundred bytes each, and a
+        // heartbeat for the stall watchdog.
         var grab = $"ddagrab=output_idx=0:framerate={fps}:draw_mouse=0:dup_frames=1";
         var common = new[] { "-hide_banner", "-loglevel", "error", "-nostdin", "-f", "lavfi", "-i", grab };
         // Short buffer: about two frames' worth, so a burst can't queue up latency.
@@ -46,8 +43,7 @@ public sealed class VideoEncoder : IDisposable
                // Keyframes only at the start: a restart (see Pacer) is the repair, and P-frames are
                // much smaller than rolling-refresh frames, so the picture is sharper per bit.
                "-bf", "0", "-g", $"{fps * 60}"];
-        string[] output = ["-f", "mp4", "-movflags", "empty_moov+default_base_moof+frag_every_frame",
-                           "-flush_packets", "1", "pipe:1"];
+        string[] output = ["-f", "avi", "-flush_packets", "1", "pipe:1"];
         return [.. common, .. codec, .. output];
     }
 
@@ -67,80 +63,60 @@ public sealed class VideoEncoder : IDisposable
         _process.BeginErrorReadLine();
     }
 
-    /// Reads the fragmented MP4 from FFmpeg: the config once (from the moov), then one frame per mdat.
-    /// Returns when FFmpeg exits.
+    /// Reads the AVI from FFmpeg: the config from the first keyframe's parameter sets, then one
+    /// frame per chunk, converted to length-prefixed NAL units for VideoToolbox. Returns when FFmpeg exits.
     public async Task RunAsync(Func<VideoConfig, Task> onConfig, Func<byte[], bool, Task> onFrame, int fps, CancellationToken cancel)
     {
         var stream = _process.StandardOutput.BaseStream;
-        var header = new byte[8];
+        var header = new byte[12];
+        try { await stream.ReadExactlyAsync(header, cancel); }   // RIFF size AVI
+        catch (EndOfStreamException) { return; }
+        if (Encoding.ASCII.GetString(header, 0, 4) != "RIFF") throw new InvalidDataException("FFmpeg's output isn't AVI");
+        var configured = false;
         while (!cancel.IsCancellationRequested)
         {
-            try { await stream.ReadExactlyAsync(header, cancel); }
+            try { await stream.ReadExactlyAsync(header.AsMemory(0, 8), cancel); }
             catch (EndOfStreamException) { return; }
-            long size = BinaryPrimitives.ReadUInt32BigEndian(header);
-            var type = Encoding.ASCII.GetString(header, 4, 4);
-            var headerLength = 8;
-            if (size == 1)
+            var id = Encoding.ASCII.GetString(header, 0, 4);
+            var size = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(4));
+            if (id is "RIFF" or "LIST")
             {
-                var large = new byte[8];
-                await stream.ReadExactlyAsync(large, cancel);
-                size = (long)BinaryPrimitives.ReadUInt64BigEndian(large);
-                headerLength = 16;
+                // hdrl is skipped whole; movi (and the RIFF AVIX that continue past 1 GB) hold the frames.
+                await stream.ReadExactlyAsync(header.AsMemory(8, 4), cancel);
+                var form = Encoding.ASCII.GetString(header, 8, 4);
+                if (form is "movi" or "AVIX") continue;
+                await SkipAsync(stream, (long)size - 4 + (size & 1), cancel);
+                continue;
             }
-            var bodyLength = size - headerLength;
-            if (bodyLength < 0 || bodyLength > StreamProtocol.MaxMessage) throw new InvalidDataException($"bad MP4 box {type} ({size} bytes)");
-            var body = new byte[bodyLength];
+            if (size > StreamProtocol.MaxMessage) throw new InvalidDataException($"bad AVI chunk {id} ({size} bytes)");
+            var body = new byte[size];
             await stream.ReadExactlyAsync(body, cancel);
+            if ((size & 1) == 1) await SkipAsync(stream, 1, cancel);
+            if (size == 0 || !id.EndsWith("dc", StringComparison.Ordinal)) continue;   // empty: a repeat FFmpeg dropped
 
-            switch (type)
+            var nals = Hevc.SplitAnnexB(body);
+            var keyframe = Hevc.IsKeyframe(nals);
+            if (!configured)
             {
-                case "moov":
-                    var config = ParseConfig(body, fps) ?? throw new InvalidDataException("no HEVC track in FFmpeg's output");
-                    await onConfig(config);
-                    break;
-                case "mdat":
-                    await onFrame(body, ContainsIdr(body));
-                    break;
+                byte[]? Find(int type) => nals.FirstOrDefault(n => Hevc.NalType(n) == type) is { Count: > 0 } n ? n.ToArray() : null;
+                if (!keyframe || Find(Hevc.Vps) is not { } vps || Find(Hevc.Sps) is not { } sps || Find(Hevc.Pps) is not { } pps) continue;
+                var config = Hevc.Config(vps, sps, pps) ?? throw new InvalidDataException("couldn't read the encoder's SPS");
+                await onConfig(new VideoConfig(config.Width, config.Height, fps, config.HvcC));
+                configured = true;
             }
+            await onFrame(Hevc.LengthPrefixed(nals), keyframe);
         }
     }
 
-    /// Width, height and the hvcC record from the sample entry ('hvc1' or 'hev1') inside the moov.
-    public static VideoConfig? ParseConfig(byte[] moov, int fps)
+    static async Task SkipAsync(Stream stream, long count, CancellationToken cancel)
     {
-        var entry = IndexOf(moov, "hvc1"u8);
-        if (entry < 0) entry = IndexOf(moov, "hev1"u8);
-        if (entry < 4) return null;
-        // VisualSampleEntry: after the 8-byte box header, 6 reserved + 2 index + 16 predefined, then width, height.
-        var boxStart = entry - 4;
-        var width = BinaryPrimitives.ReadUInt16BigEndian(moov.AsSpan(boxStart + 32));
-        var height = BinaryPrimitives.ReadUInt16BigEndian(moov.AsSpan(boxStart + 34));
-        var hvcc = IndexOf(moov, "hvcC"u8, entry);
-        if (hvcc < 4) return null;
-        var hvccSize = (int)BinaryPrimitives.ReadUInt32BigEndian(moov.AsSpan(hvcc - 4));
-        if (hvccSize < 8 || hvcc - 4 + hvccSize > moov.Length) return null;
-        return new VideoConfig(width, height, fps, moov.AsSpan(hvcc + 4, hvccSize - 8).ToArray());
-    }
-
-    /// True if a sample (4-byte length-prefixed NAL units) contains an IDR or CRA slice.
-    public static bool ContainsIdr(ReadOnlySpan<byte> sample)
-    {
-        var offset = 0;
-        while (offset + 5 <= sample.Length)
+        var buffer = new byte[Math.Min(count, 64 * 1024)];
+        while (count > 0)
         {
-            var length = (int)BinaryPrimitives.ReadUInt32BigEndian(sample[offset..]);
-            if (length <= 0 || offset + 4 + length > sample.Length) return false;
-            var nalType = (sample[offset + 4] >> 1) & 0x3F;
-            if (nalType is >= 16 and <= 21) return true;   // BLA, IDR, CRA
-            offset += 4 + length;
+            var read = await stream.ReadAsync(buffer.AsMemory(0, (int)Math.Min(count, buffer.Length)), cancel);
+            if (read == 0) throw new EndOfStreamException();
+            count -= read;
         }
-        return false;
-    }
-
-    static int IndexOf(byte[] haystack, ReadOnlySpan<byte> needle, int start = 0)
-    {
-        var found = haystack.AsSpan(start).IndexOf(needle);
-        return found < 0 ? -1 : start + found;
     }
 
     public void Dispose()

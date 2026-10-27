@@ -54,7 +54,7 @@ final class KeyCaptureView: UIView, UIKeyInput, UITextInputTraits {
     }
 
     private let emptyInputView = UIView(frame: .zero)
-    private let keyHaptic = UIImpactFeedbackGenerator(style: .light)
+    private let keyHaptic = UIImpactFeedbackGenerator(style: .medium)
     /// Read live, so the Settings switch applies to an open session.
     private var keyHapticsEnabled: Bool { UserDefaults.standard.object(forKey: "keyHaptics") as? Bool ?? true }
     private var lastShownAt: TimeInterval = 0
@@ -137,7 +137,7 @@ final class KeyCaptureView: UIView, UIKeyInput, UITextInputTraits {
     /// A light tap per on-screen key, like a real key's click. Hardware keyboards don't need one.
     private func tapHaptic() {
         guard softwareKeyboardShown, keyHapticsEnabled else { return }
-        keyHaptic.impactOccurred(intensity: 0.6)
+        keyHaptic.impactOccurred(intensity: 1)
         keyHaptic.prepare()
     }
 

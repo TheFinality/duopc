@@ -84,6 +84,24 @@ struct TouchInterpreterTests {
         #expect(t.update(touches: b, time: 0.05) == [.pan(CGVector(dx: 15, dy: 5))])
     }
 
+    @Test mutating func viewModeNeverClicks() {
+        t.mode = .view
+        _ = t.update(touches: [0: CGPoint(x: 100, y: 100)], time: 0)
+        #expect(t.update(touches: [:], time: 0.1).isEmpty)                  // tap
+        _ = t.update(touches: [0: CGPoint(x: 100, y: 100)], time: 1)
+        #expect(t.tick(time: 1.5).isEmpty)                                   // hold
+        #expect(t.update(touches: [:], time: 1.6).isEmpty)
+        _ = t.update(touches: [0: CGPoint(x: 100, y: 100), 1: CGPoint(x: 160, y: 100)], time: 2)
+        #expect(t.update(touches: [:], time: 2.1).isEmpty)                  // two-finger tap
+    }
+
+    @Test mutating func viewModeDragMovesThePictureSideways() {
+        t.mode = .view
+        _ = t.update(touches: [0: CGPoint(x: 100, y: 100)], time: 0)
+        #expect(t.update(touches: [0: CGPoint(x: 60, y: 102)], time: 0.05) == [.pan(CGVector(dx: -40, dy: 2))])
+        guard case .panEnded? = t.update(touches: [:], time: 0.1).first else { Issue.record("no pan end"); return }
+    }
+
     @Test func gainRampsWithSpeed() {
         #expect(InputController.gain(speed: 0) == 1)
         #expect(InputController.gain(speed: 5000) == 2.5)

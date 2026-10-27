@@ -4,6 +4,9 @@ import Observation
 
 enum InputMode: String, CaseIterable, Identifiable {
     case trackpad, direct
+    /// Look only (the laptop-pose screen, unless Settings says otherwise): one finger moves the
+    /// zoomed picture, pinch zooms, two fingers scroll the PC, and nothing clicks.
+    case view
     var id: String { rawValue }
 }
 

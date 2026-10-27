@@ -46,6 +46,8 @@ protocol SessionDisplay: AnyObject {
     func frameDidArrive()
     func cursorDidChange()
     func viewportDidChange()
+    /// Typing or clicking: draw at the full rate for a moment, so the PC's answer shows the instant it arrives.
+    func markActive()
 }
 
 /// One remote PC. Long-lived: survives reconnects so the viewport and pointer stay put.
@@ -454,11 +456,15 @@ final class VNCSession {
     // MARK: Keyboard
 
     /// Raw key events (hardware keyboard). No sticky modifiers applied.
-    func keyDown(_ key: VNCKeyCode) { link?.keyDown(key) }
+    func keyDown(_ key: VNCKeyCode) {
+        display?.markActive()
+        link?.keyDown(key)
+    }
     func keyUp(_ key: VNCKeyCode) { link?.keyUp(key) }
 
     /// Down + up, wrapped in the latched/locked modifiers.
     func press(_ key: VNCKeyCode) {
+        display?.markActive()
         withModifiers { $0.tap(key) }
     }
 
@@ -466,6 +472,7 @@ final class VNCSession {
     func type(_ text: String) {
         let codes = KeyMapping.keyCodes(for: text)
         guard !codes.isEmpty else { return }
+        display?.markActive()
         withModifiers { c in codes.forEach(c.tap) }
     }
 

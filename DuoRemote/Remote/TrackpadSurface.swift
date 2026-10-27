@@ -37,7 +37,7 @@ final class TrackpadSurfaceView: UIView {
     private var linkProxy: TrackpadLinkProxy?
     private var lastTick: CFTimeInterval = 0
     private let grabHaptic = UIImpactFeedbackGenerator(style: .medium)
-    private let clickHaptic = UIImpactFeedbackGenerator(style: .light)
+    private let clickHaptic = UIImpactFeedbackGenerator(style: .heavy)
 
     init(session: VNCSession) {
         self.session = session
@@ -62,7 +62,7 @@ final class TrackpadSurfaceView: UIView {
 
     private func wireHaptics() {
         input.onGrab = { [weak self] in self?.grabHaptic.impactOccurred() }
-        input.onClick = { [weak self] in self?.clickHaptic.impactOccurred(intensity: 0.6) }
+        input.onClick = { [weak self] in self?.clickHaptic.impactOccurred(intensity: 1) }
     }
 
     override func didMoveToWindow() {

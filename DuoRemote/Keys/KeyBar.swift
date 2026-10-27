@@ -90,7 +90,7 @@ struct KeyBarModifierKeys: View {
                 .accessibilityValue(mode == .locked ? "Locked" : mode == .latched ? "On" : "Off")
             }
         }
-        .sensoryFeedback(.impact(weight: .light), trigger: haptic)
+        .sensoryFeedback(.impact(weight: .medium), trigger: haptic)
     }
 }
 
@@ -124,7 +124,7 @@ struct KeyBarMouseKeys: View {
             KeyCap(label: Image(systemName: "contextualmenu.and.cursorarrow"), state: .off, accent: .nav)
         }
         .buttonStyle(.plain)
-        .sensoryFeedback(.impact(weight: .light), trigger: haptic)
+        .sensoryFeedback(.impact(weight: .medium), trigger: haptic)
         .accessibilityLabel("Right click")
     }
 }
@@ -145,7 +145,7 @@ struct KeyBarKeyboardToggle: View {
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .sensoryFeedback(.impact(weight: .light), trigger: haptic)
+        .sensoryFeedback(.impact(weight: .medium), trigger: haptic)
         .accessibilityLabel(shown ? "Hide keyboard" : "Show keyboard")
     }
 }
@@ -210,7 +210,7 @@ private struct RepeatingKey<Label: View>: View {
                 repeater.end()
             }
         })
-        .sensoryFeedback(.impact(weight: .light), trigger: haptic)
+        .sensoryFeedback(.impact(weight: .medium), trigger: haptic)
         .accessibilityLabel(name)
         .onDisappear { repeater.end() }
     }

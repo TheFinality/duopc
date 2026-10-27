@@ -69,7 +69,7 @@ struct TouchInterpreter {
 
         case let .oneDown(id, start, _, t0):
             if n == 0 {
-                if t - t0 <= thresholds.tapMaxDuration {
+                if t - t0 <= thresholds.tapMaxDuration, mode != .view {
                     out.append(.click(.left, at: mode == .direct ? start : nil))
                 }
                 state = .idle
@@ -91,7 +91,7 @@ struct TouchInterpreter {
                 out += oneFingerMove(from: last, to: p, t: t)
                 state = .oneMoving(id: id, last: p)
             } else {
-                if mode == .direct { out.append(.panEnded(velocity: n == 0 ? velocity.velocity : .zero)) }
+                if mode != .trackpad { out.append(.panEnded(velocity: n == 0 ? velocity.velocity : .zero)) }
                 state = n == 0 ? .idle : .finishing
             }
 
@@ -124,7 +124,7 @@ struct TouchInterpreter {
                     state = .scrolling(ids: ids, lastC: c)
                 }
             } else if n < 2 {
-                if t - t0 <= thresholds.twoFingerTapMaxDuration {
+                if t - t0 <= thresholds.twoFingerTapMaxDuration, mode != .view {
                     out.append(.click(.right, at: mode == .direct ? c0 : nil))
                 }
                 state = n == 0 ? .idle : .finishing
@@ -178,7 +178,7 @@ struct TouchInterpreter {
 
     /// Call once per frame: fires the hold → button-down transition.
     mutating func tick(time t: TimeInterval) -> [TouchIntent] {
-        guard case let .oneDown(id, start, last, t0) = state, t - t0 >= thresholds.holdDuration else { return [] }
+        guard mode != .view, case let .oneDown(id, start, last, t0) = state, t - t0 >= thresholds.holdDuration else { return [] }
         state = .holding(id: id, last: last)
         velocity.reset(last, t)
         return [.grabbed, .buttonDown(at: mode == .direct ? start : nil)]
@@ -210,7 +210,7 @@ struct TouchInterpreter {
 
     private func oneFingerMove(from a: CGPoint, to b: CGPoint, t: TimeInterval) -> [TouchIntent] {
         let d = CGVector(dx: b.x - a.x, dy: b.y - a.y)
-        return mode == .direct ? [.pan(d)] : [.pointerDelta(d, speed: velocity.speed)]
+        return mode == .trackpad ? [.pointerDelta(d, speed: velocity.speed)] : [.pan(d)]
     }
 
     private func centroid(_ touches: [Int: CGPoint]) -> CGPoint {

@@ -23,7 +23,7 @@ final class RemoteCanvasView: UIView, SessionDisplay {
     private var touchIDs: [ObjectIdentifier: Int] = [:]
     private var nextTouchID = 0
     private let grabHaptic = UIImpactFeedbackGenerator(style: .medium)
-    private let clickHaptic = UIImpactFeedbackGenerator(style: .light)
+    private let clickHaptic = UIImpactFeedbackGenerator(style: .heavy)
 
     var inputModeOverride: InputMode?
     /// The mouse button a pointer click is holding (see PointerInput.swift).
@@ -83,7 +83,7 @@ final class RemoteCanvasView: UIView, SessionDisplay {
             setNeedsLayout()
         }
         input.onGrab = { [weak self] in self?.grabHaptic.impactOccurred() }
-        input.onClick = { [weak self] in self?.clickHaptic.impactOccurred(intensity: 0.5) }
+        input.onClick = { [weak self] in self?.clickHaptic.impactOccurred(intensity: 1) }
         s.clickObserver = { [weak self] p in self?.addRipple(atContentPoint: p) }
         if s.surface != nil, materialiseStart == nil, !wasConnected { startMaterialise() }
         renderer?.setSurface(s.surface)
