@@ -56,6 +56,19 @@ struct TouchInterpreterTests {
         guard case .scrollEnded? = end.first else { Issue.record("no scroll end"); return }
     }
 
+    @Test mutating func closeFingersThatWobbleStillScroll() {
+        // 40 pt apart; the gap wobbles to 46 pt (15%) while both fingers move up 14 pt.
+        _ = t.update(touches: [0: CGPoint(x: 100, y: 100), 1: CGPoint(x: 140, y: 100)], time: 0)
+        let out = t.update(touches: [0: CGPoint(x: 97, y: 86), 1: CGPoint(x: 143, y: 86)], time: 0.05)
+        guard case .scroll? = out.first else { Issue.record("expected a scroll, got \(out)"); return }
+    }
+
+    @Test mutating func smallSpreadWithoutMovementWaits() {
+        _ = t.update(touches: [0: CGPoint(x: 100, y: 100), 1: CGPoint(x: 140, y: 100)], time: 0)
+        let out = t.update(touches: [0: CGPoint(x: 95, y: 100), 1: CGPoint(x: 145, y: 100)], time: 0.05)
+        #expect(out.isEmpty)                                 // 10 pt of spread: not yet a pinch
+    }
+
     @Test mutating func spreadingFingersPinches() {
         _ = t.update(touches: [0: CGPoint(x: 100, y: 100), 1: CGPoint(x: 200, y: 100)], time: 0)
         let out = t.update(touches: [0: CGPoint(x: 80, y: 100), 1: CGPoint(x: 220, y: 100)], time: 0.05)

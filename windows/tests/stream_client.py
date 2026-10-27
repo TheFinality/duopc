@@ -34,6 +34,7 @@ def send(kind, payload=b""):
 send(0x10, struct.pack("<IH", 8000, 30))           # Start: 8 Mbps, 30 fps
 
 annexb, config, frames, keyframes, sizes, first_frame_at, stats = bytearray(), None, 0, 0, [], None, []
+configs, pending_sets = 0, bytearray()
 start = time.time()
 sock.settimeout(2)
 try:
@@ -44,14 +45,19 @@ try:
             width, height, fps, codec = struct.unpack_from("<IIHB", payload)
             hvcc = payload[11:]
             config = (width, height, fps, codec, len(hvcc))
+            configs += 1
+            pending_sets = bytearray()
             n, pos = hvcc[22], 23
-            for _ in range(n):                            # parameter sets → Annex B
-                count = struct.unpack_from(">H", hvcc, pos + 1)[0]; pos += 3
+            for _ in range(n):                            # parameter sets → Annex B, put before the next
+                count = struct.unpack_from(">H", hvcc, pos + 1)[0]; pos += 3   # frame unless it has its own
                 for _ in range(count):
                     size = struct.unpack_from(">H", hvcc, pos)[0]
-                    annexb += b"\x00\x00\x00\x01" + hvcc[pos + 2:pos + 2 + size]; pos += 2 + size
+                    pending_sets += b"\x00\x00\x00\x01" + hvcc[pos + 2:pos + 2 + size]; pos += 2 + size
         elif kind == 0x02:
             flags = payload[0]; sample = payload[9:]
+            in_band = len(sample) > 4 and ((sample[4] >> 1) & 0x3F) in (32, 33, 34, 35)
+            if pending_sets and not in_band: annexb += pending_sets
+            pending_sets = bytearray()
             send(0x17, payload[1:9])                       # FrameAck: echo the frame's time
             frames += 1; keyframes += flags & 1; sizes.append(len(sample))
             first_frame_at = first_frame_at or time.time() - start
@@ -68,7 +74,7 @@ except (socket.timeout, EOFError):
     pass
 sock.close()
 
-print(f"config: {config}")
+print(f"config: {config} (received {configs})")
 print(f"stats (fps, skipped, kbps, best rtt ms): {stats}")
 print(f"frames: {frames} ({keyframes} keyframes) in {seconds:.0f}s, first after {first_frame_at and round(first_frame_at, 2)}s, "
       f"avg {sum(sizes) // max(len(sizes), 1)} bytes, max {max(sizes, default=0)} bytes")

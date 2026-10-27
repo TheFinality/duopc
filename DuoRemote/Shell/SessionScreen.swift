@@ -126,11 +126,7 @@ struct SessionScreen: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .background {
-                KeyboardInput(session: session, softwareKeyboardShown: $keyboardShown, isSuspended: composeShown,
-                              // No room for the suggestion bar in laptop pose: it covers the deck's top bar.
-                              allowsSuggestions: laptopFold == nil)
-            }
+            .background { KeyboardInput(session: session, softwareKeyboardShown: $keyboardShown, isSuspended: composeShown) }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { note in
                 let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect) ?? .zero
                 keyboardTop = frame.height > 100 ? frame.minY : nil   // ignore the hardware-keyboard shortcut bar

@@ -24,24 +24,28 @@ public sealed class VideoEncoder : IDisposable
         return "ffmpeg.exe";   // on PATH (development)
     }
 
-    /// Rolling intra refresh period: a skipped frame's damage is repaired within this many frames,
-    /// and there are no big keyframes after the first one to cause their own delay spikes.
-    public const int RefreshFrames = 30;
-
     public static string[] Arguments(int bitrateKbps, int fps, bool software)
     {
         // No pointer in the video: the app draws its own, which moves the instant the finger does.
-        var grab = $"ddagrab=output_idx=0:framerate={fps}:draw_mouse=0:dup_frames=0";
+        // Frames keep coming on a still screen (dup_frames): MP4 writes a frame only once the next
+        // one arrives (it needs its duration), so without them the last frame of every change would
+        // wait for the next change: a stale picture. Repeated frames cost a few hundred bytes each,
+        // and double as a heartbeat for the stall watchdog.
+        var grab = $"ddagrab=output_idx=0:framerate={fps}:draw_mouse=0:dup_frames=1";
         var common = new[] { "-hide_banner", "-loglevel", "error", "-nostdin", "-f", "lavfi", "-i", grab };
         // Short buffer: about two frames' worth, so a burst can't queue up latency.
         var buffer = Math.Max(bitrateKbps * 2 / Math.Max(fps, 1), 500);
         string[] codec = software
             ? ["-vf", "hwdownload,format=bgra,scale=1280:-2,format=yuv420p",
                "-c:v", "libx265", "-preset", "ultrafast", "-tune", "zerolatency",
-               "-x265-params", $"keyint={RefreshFrames}:intra-refresh=1:bframes=0:log-level=error", "-b:v", $"{bitrateKbps}k"]
+               "-x265-params", $"keyint={fps * 60}:bframes=0:log-level=error", "-b:v", $"{bitrateKbps}k"]
             : ["-c:v", "hevc_nvenc", "-preset", "p1", "-tune", "ull", "-zerolatency", "1", "-delay", "0",
-               "-rc", "cbr", "-b:v", $"{bitrateKbps}k", "-maxrate", $"{bitrateKbps}k", "-bufsize", $"{buffer}k",
-               "-bf", "0", "-g", $"{RefreshFrames}", "-intra-refresh", "1"];
+               // Constant quality capped at the bitrate, not CBR: CBR pads every repeated frame up to
+               // the full rate, keeping the link saturated while nothing changes.
+               "-rc", "vbr", "-cq", "23", "-b:v", "0", "-maxrate", $"{bitrateKbps}k", "-bufsize", $"{buffer}k",
+               // Keyframes only at the start: a restart (see Pacer) is the repair, and P-frames are
+               // much smaller than rolling-refresh frames, so the picture is sharper per bit.
+               "-bf", "0", "-g", $"{fps * 60}"];
         string[] output = ["-f", "mp4", "-movflags", "empty_moov+default_base_moof+frag_every_frame",
                            "-flush_packets", "1", "pipe:1"];
         return [.. common, .. codec, .. output];

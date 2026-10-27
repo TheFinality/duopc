@@ -56,8 +56,8 @@ var bitrateKbps = 20_000;
 var fps = 60;
 VideoEncoder? encoder = null;
 Task? encoderLoop = null;
-// For the capture watchdog: when the phone last sent input, and when FFmpeg last produced a frame.
-long lastInputTicks = 0, lastFrameTicks = Environment.TickCount64;
+// For the capture watchdog: when FFmpeg last produced a frame.
+long lastFrameTicks = Environment.TickCount64;
 
 async Task SendAsync(byte type, byte[] payload)
 {
@@ -92,10 +92,21 @@ async Task RunEncoderAsync(CancellationToken stop)
                 },
                 onFrame: async (sample, keyframe) =>
                 {
+                    // A replaced encoder's last frames can still be in the pipe; they follow skipped
+                    // frames, so they'd decode wrong. Only the new encoder's frames go out.
+                    if (stop.IsCancellationRequested) return;
                     frames++;
                     var now = Environment.TickCount64;
                     lastFrameTicks = now;
-                    if (pacer.ShouldSend(keyframe, now))
+                    var decision = pacer.Decide(keyframe, now);
+                    if (decision == Pacer.Decision.Restart)
+                    {
+                        // Frames were skipped: start over from a fresh keyframe of the current screen.
+                        log.Info("network caught up after skipping frames: restarting for a clean picture");
+                        RestartEncoder();
+                        return;
+                    }
+                    if (decision == Pacer.Decision.Send)
                     {
                         var time = (ulong)(DateTimeOffset.UtcNow - started).Ticks / 10;
                         var payload = new byte[9 + sample.Length];
@@ -134,6 +145,7 @@ CancellationTokenSource? encoderStop = null;
 void RestartEncoder()
 {
     lastFrameTicks = Environment.TickCount64;
+    pacer.EncoderRestarted();
     encoderStop?.Cancel();
     encoder?.Dispose();
     encoderStop = CancellationTokenSource.CreateLinkedTokenSource(cancel.Token);
@@ -141,18 +153,17 @@ void RestartEncoder()
     encoderLoop = Task.Run(() => RunEncoderAsync(token));
 }
 
-// Capture watchdog: the phone is being used, yet no frame has come out of FFmpeg for a while. A
-// still screen makes no frames (nothing changed), but input usually changes something, so a long
-// silence while there's input means the capture has stalled: restart it.
+// Capture watchdog: frames come continuously (repeated on a still screen), so two seconds without
+// one means the capture has stalled: restart it.
 _ = Task.Run(async () =>
 {
     while (!cancel.IsCancellationRequested)
     {
         await Task.Delay(1000, cancel.Token).ContinueWith(_ => { });
         var now = Environment.TickCount64;
-        if (encoderStop is not null && now - lastInputTicks < 2000 && now - lastFrameTicks > 3000)
+        if (encoderStop is not null && now - lastFrameTicks > 2000)
         {
-            log.Info("no frames for 3 s while the phone is in use: restarting capture");
+            log.Info("no frames for 2 s: restarting capture");
             RestartEncoder();
         }
     }
@@ -163,7 +174,6 @@ try
     while (await StreamProtocol.ReadAsync(stream, cancel.Token) is { } message)
     {
         var p = message.Payload;
-        if (message.Type is >= StreamProtocol.PointerMove and <= StreamProtocol.Text) lastInputTicks = Environment.TickCount64;
         switch (message.Type)
         {
             case StreamProtocol.Start when p.Length >= 6:

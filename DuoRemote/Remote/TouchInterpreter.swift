@@ -31,7 +31,11 @@ struct TouchInterpreter {
         var tapMaxDuration: TimeInterval = 0.25
         var holdDuration: TimeInterval = 0.30
         var twoFingerTapMaxDuration: TimeInterval = 0.30
-        var pinchCommitLogRatio: CGFloat = 0.10
+        /// A pinch needs the fingers' spacing to change by this much (relative and absolute), and
+        /// by more than they've moved together: close-together fingers wobble a few points while
+        /// scrolling, which is already 10% of a small gap.
+        var pinchCommitLogRatio: CGFloat = 0.15
+        var pinchCommitDistance: CGFloat = 28
         var scrollCommitDistance: CGFloat = 10
     }
 
@@ -108,11 +112,13 @@ struct TouchInterpreter {
         case let .twoDown(ids, c0, span0, t0):
             if n == 2, Set(touches.keys) == ids {
                 let c = centroid(touches), s = span(touches)
-                if span0 > 0, abs(log(s / span0)) > thresholds.pinchCommitLogRatio {
+                let spread = abs(s - span0), travel = c.distance(to: c0)
+                if span0 > 0, spread > thresholds.pinchCommitDistance, spread > travel,
+                   abs(log(s / span0)) > thresholds.pinchCommitLogRatio {
                     out.append(.zoom(factor: s / span0, anchor: c))
                     out.append(.pan(CGVector(dx: c.x - c0.x, dy: c.y - c0.y)))
                     state = .pinching(ids: ids, lastC: c, lastSpan: s)
-                } else if c.distance(to: c0) > thresholds.scrollCommitDistance {
+                } else if travel > thresholds.scrollCommitDistance, travel > spread / 2 {
                     velocity.reset(c, t)
                     out.append(.scroll(CGVector(dx: c.x - c0.x, dy: c.y - c0.y)))
                     state = .scrolling(ids: ids, lastC: c)
