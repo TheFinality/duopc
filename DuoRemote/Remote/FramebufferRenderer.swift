@@ -211,7 +211,12 @@ fragment float4 framebufferFragment(VOut in [[stage_in]],
         pass.colorAttachments[0].loadAction = .clear
         pass.colorAttachments[0].storeAction = .store
         pass.colorAttachments[0].clearColor = MTLClearColor(red: 0.08, green: 0.08, blue: 0.09, alpha: 1)
-        guard let enc = buffer.makeRenderCommandEncoder(descriptor: pass) else { return }
+        guard let enc = buffer.makeRenderCommandEncoder(descriptor: pass) else {
+            // Still commit: the completion handler is what counts this frame back down. Without it,
+            // two such failures leave `pending` at 2 and nothing is ever drawn again.
+            buffer.commit()
+            return
+        }
         if let texture {
             let w = Float(bounds.width), h = Float(bounds.height)
             // Full-window strip: NDC position + view-point coordinate.

@@ -44,6 +44,8 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
         case notice(String)
         /// Once a second from the PC: frames sent, frames skipped to keep the delay down, kbps, best round trip.
         case stats(fps: Int, skipped: Int, kbps: Int, roundTripMs: Int)
+        /// Something worth a line in the connection log (decoder trouble and recovery).
+        case log(String)
         case closed(Failure?)
     }
 
@@ -57,6 +59,9 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
     private let fps: Int
     // Queue-confined.
     private var decoder: HEVCDecoder?
+    /// The last Config, to rebuild the decoder from.
+    private var config: (width: Int, height: Int, hvcC: Data)?
+    private var failedFrames = 0
     private var finished = false
     private var closing = false
 
@@ -121,6 +126,11 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
 
     func keyDown(_ key: VNCKeyCode) { sendKey(key, down: true) }
     func keyUp(_ key: VNCKeyCode) { sendKey(key, down: false) }
+
+    /// Asks the PC for a fresh keyframe (it restarts its encoder), e.g. to repair a stuck picture.
+    func requestKeyframe() {
+        send(0x18, Data())
+    }
 
     /// Asks the PC to restart its encoder at this bitrate.
     func setBitrate(kbps: Int) {
@@ -195,13 +205,22 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
         switch type {
         case 0x01 where payload.count > 11:   // Config: u32 width, u32 height, u16 fps, u8 codec, hvcC
             let width = Int(payload.readLE(UInt32.self, at: 0)), height = Int(payload.readLE(UInt32.self, at: 4))
-            decoder = HEVCDecoder(width: width, height: height, hvcC: payload.subdata(in: (payload.startIndex + 11)..<payload.endIndex))
+            config = (width, height, payload.subdata(in: (payload.startIndex + 11)..<payload.endIndex))
+            failedFrames = 0
+            decoder = HEVCDecoder(width: width, height: height, hvcC: config!.hvcC)
             if decoder == nil { onEvent?(.notice("This iPhone couldn't set up a decoder for the PC's video.")) }
         case 0x02 where payload.count > 9:    // Frame: u8 flags, u64 time, sample
-            let pixels = decoder?.decode(payload.subdata(in: (payload.startIndex + 9)..<payload.endIndex))
+            let result = decoder?.decode(payload.subdata(in: (payload.startIndex + 9)..<payload.endIndex))
             // Acknowledge every frame, decoded or not: the PC paces itself by these (see Pacer.cs).
             send(0x17, payload.subdata(in: (payload.startIndex + 1)..<(payload.startIndex + 9)))
-            guard let pixels, let ref = CVPixelBufferGetIOSurface(pixels)?.takeUnretainedValue() else { return }
+            guard let pixels = result?.pixels, let ref = CVPixelBufferGetIOSurface(pixels)?.takeUnretainedValue() else {
+                decodeFailed(status: result?.status ?? 0)
+                return
+            }
+            if failedFrames > 0 {
+                onEvent?(.log("decoding recovered after \(failedFrames) failed frames"))
+                failedFrames = 0
+            }
             let surface = unsafeBitCast(ref, to: IOSurface.self)
             let size = CGSize(width: CVPixelBufferGetWidth(pixels), height: CVPixelBufferGetHeight(pixels))
             onEvent?(.frame(SurfaceBox(surface: surface, size: size, owner: pixels)))
@@ -213,6 +232,19 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
         default:
             break
         }
+    }
+
+    /// A frame didn't decode. A few in a row is normal right after skipped frames (the rolling
+    /// refresh repairs it); a run of them, or a dead decoder session (iOS can reset the hardware
+    /// decoder), means rebuilding the decoder and asking for a keyframe.
+    private func decodeFailed(status: OSStatus) {
+        failedFrames += 1
+        let sessionDead = status == kVTInvalidSessionErr
+        if failedFrames == 1 || sessionDead { onEvent?(.log("decode failed (\(status))")) }
+        guard sessionDead || failedFrames % 45 == 0, let config else { return }
+        onEvent?(.log("rebuilding the decoder after \(failedFrames) failed frames; asking for a keyframe"))
+        decoder = HEVCDecoder(width: config.width, height: config.height, hvcC: config.hvcC)
+        requestKeyframe()
     }
 
     private func receive(_ count: Int, then: @escaping (Data) -> Void) {
@@ -265,30 +297,33 @@ nonisolated final class HEVCDecoder {
 
     deinit { VTDecompressionSessionInvalidate(session) }
 
-    /// One sample (4-byte length-prefixed NAL units) → its decoded frame, synchronously.
-    func decode(_ sample: Data) -> CVPixelBuffer? {
+    /// One sample (4-byte length-prefixed NAL units) → its decoded frame, synchronously, and the
+    /// decoder's status (for the log when there's no frame).
+    func decode(_ sample: Data) -> (pixels: CVPixelBuffer?, status: OSStatus) {
         let length = sample.count
         var block: CMBlockBuffer?
         guard CMBlockBufferCreateWithMemoryBlock(allocator: kCFAllocatorDefault, memoryBlock: nil, blockLength: length,
                                                  blockAllocator: kCFAllocatorDefault, customBlockSource: nil, offsetToData: 0,
                                                  dataLength: length, flags: kCMBlockBufferAssureMemoryNowFlag,
                                                  blockBufferOut: &block) == kCMBlockBufferNoErr,
-              let block else { return nil }
+              let block else { return (nil, -1) }
         let copied = sample.withUnsafeBytes { bytes in
             CMBlockBufferReplaceDataBytes(with: bytes.baseAddress!, blockBuffer: block, offsetIntoDestination: 0, dataLength: length)
         }
-        guard copied == kCMBlockBufferNoErr else { return nil }
+        guard copied == kCMBlockBufferNoErr else { return (nil, copied) }
         var sampleBuffer: CMSampleBuffer?
         var size = length
         guard CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: block, formatDescription: format,
                                         sampleCount: 1, sampleTimingEntryCount: 0, sampleTimingArray: nil,
                                         sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &sampleBuffer) == noErr,
-              let sampleBuffer else { return nil }
+              let sampleBuffer else { return (nil, -2) }
         nonisolated(unsafe) var decoded: CVPixelBuffer?
+        nonisolated(unsafe) var outputStatus = noErr
         let status = VTDecompressionSessionDecodeFrame(session, sampleBuffer: sampleBuffer, flags: [], infoFlagsOut: nil) { status, _, image, _, _ in
+            outputStatus = status
             if status == noErr { decoded = image }
         }
-        return status == noErr ? decoded : nil
+        return status == noErr ? (decoded, outputStatus) : (nil, status)
     }
 }
 

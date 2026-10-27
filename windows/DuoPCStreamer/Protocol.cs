@@ -13,6 +13,7 @@ namespace DuoPCStreamer;
 ///   Text         0x15  UTF-8                   (typed as Unicode)
 ///   SetBitrate   0x16  u32 kbps                (restarts the encoder)
 ///   FrameAck     0x17  u64 time                (of a frame the phone has decoded; see Pacer)
+///   Keyframe     0x18  (empty)                 (restart the encoder: a fresh picture)
 /// PC → phone:
 ///   Config       0x01  u32 width, u32 height, u16 fps, u8 codec (1 = HEVC), hvcC record
 ///   Frame        0x02  u8 flags (1 = keyframe), u64 time µs, sample (length-prefixed NAL units)
@@ -21,7 +22,7 @@ namespace DuoPCStreamer;
 ///   Stats        0x05  u16 frames/s sent, u16 frames skipped, u32 kbps, u16 best round trip ms (once a second)
 public static class StreamProtocol
 {
-    public const byte Start = 0x10, PointerMove = 0x11, Button = 0x12, Scroll = 0x13, Key = 0x14, Text = 0x15, SetBitrate = 0x16, FrameAck = 0x17;
+    public const byte Start = 0x10, PointerMove = 0x11, Button = 0x12, Scroll = 0x13, Key = 0x14, Text = 0x15, SetBitrate = 0x16, FrameAck = 0x17, Keyframe = 0x18;
     public const byte Config = 0x01, Frame = 0x02, Status = 0x03, Clipboard = 0x04, Stats = 0x05;
     public const byte CodecHevc = 1;
     public const byte StatusCaptureUnavailable = 1, StatusEncoderFailed = 2;

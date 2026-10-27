@@ -81,7 +81,7 @@ final class KeyCaptureView: UIView, UITextInput {
     }
     /// Read when the keyboard comes up, so the Settings switch applies from the next time it opens.
     private var autocorrects: Bool {
-        allowsSuggestions && (UserDefaults.standard.object(forKey: "keyboardAutocorrect") as? Bool ?? true)
+        allowsSuggestions && (UserDefaults.standard.object(forKey: "keyboardAutocorrect") as? Bool ?? false)
     }
     var autocorrectionType: UITextAutocorrectionType {
         get { autocorrects ? .yes : .no }

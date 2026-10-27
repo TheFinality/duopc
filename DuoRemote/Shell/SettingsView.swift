@@ -8,8 +8,7 @@ struct SettingsView: View {
     @AppStorage("invertScroll") private var invertScroll = false
     @AppStorage(PictureQuality.storageKey) private var pictureQuality: PictureQuality = .balanced
     @AppStorage("keyHaptics") private var keyHaptics = true
-    @AppStorage("keyboardAutocorrect") private var keyboardAutocorrect = true
-    @AppStorage("laptopAutocorrect") private var laptopAutocorrect = false
+    @AppStorage("keyboardAutocorrect") private var keyboardAutocorrect = false
     @AppStorage("autoCompose") private var autoCompose = true
     @AppStorage("effectsEnabled") private var effectsEnabled = true
     @AppStorage("skyTheme") private var skyTheme = true
@@ -55,13 +54,10 @@ struct SettingsView: View {
                     Toggle("Open the text box when you click into text", isOn: $autoCompose)
                     Toggle("Haptic feedback when typing", isOn: $keyHaptics)
                     Toggle("Autocorrect and suggestions", isOn: $keyboardAutocorrect)
-                    if keyboardAutocorrect {
-                        Toggle("Autocorrect in laptop pose", isOn: $laptopAutocorrect)
-                    }
                 } header: {
                     Text("Controls")
                 } footer: {
-                    Text("Natural scrolling moves content with your finger. Changes apply to the next connection. Autocorrect fixes words as you type on the keyboard, by sending Backspaces and the corrected word to the PC; it starts fresh whenever you click or use a key from the bar, and applies the next time the keyboard opens. Turn it off for passwords. In laptop pose it's off unless you turn it on there too: the suggestion bar makes the keyboard taller and covers the deck's top bar. Typing haptics are a light tap per key on the keyboard; if you also feel iOS's own keyboard haptics (Settings → Sounds & Haptics → Keyboard Feedback), turn one of them off.")
+                    Text("Natural scrolling moves content with your finger. Changes apply to the next connection. Autocorrect fixes words as you type on the keyboard, by sending Backspaces and the corrected word to the PC, and adds iOS's suggestion bar above the keyboard (not in laptop pose, where it would cover the deck). It starts fresh whenever you click or use a key from the bar, and applies the next time the keyboard opens. Typing haptics are a light tap per key on the keyboard; if you also feel iOS's own keyboard haptics (Settings → Sounds & Haptics → Keyboard Feedback), turn one of them off.")
                 }
 
                 Section {

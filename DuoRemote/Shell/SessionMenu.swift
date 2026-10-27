@@ -38,6 +38,9 @@ struct SessionMenu: View {
             }
             .pickerStyle(.menu)
             Section {
+                if session.isVideo {
+                    Button("Refresh picture", systemImage: "arrow.clockwise") { session.refreshVideo() }
+                }
                 Button("Zoom to fit", systemImage: "arrow.down.right.and.arrow.up.left") { session.zoomToFit() }
                 Button("Actual pixels", systemImage: "1.magnifyingglass") { session.zoomToActualPixels() }
             }

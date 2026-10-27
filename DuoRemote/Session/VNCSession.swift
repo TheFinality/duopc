@@ -279,6 +279,8 @@ final class VNCSession {
         case .notice(let text):
             note("video: \(text)")
             videoNotice = text
+        case .log(let line):
+            note("video: \(line)")
         case .stats(let fps, let skipped, let kbps, let roundTripMs):
             // One line every few seconds is enough to see how the link is doing.
             videoStatsCount += 1
@@ -569,6 +571,13 @@ final class VNCSession {
         copy.draw(wrapped, in: CGRect(x: -crop.minX, y: crop.maxY - CGFloat(surf.height),
                                       width: CGFloat(surf.width), height: CGFloat(surf.height)))
         return copy.makeImage().map { UIImage(cgImage: $0) }
+    }
+
+    /// Asks the PC for a fresh keyframe (••• → Refresh picture), in case the picture is stuck.
+    func refreshVideo() {
+        guard let video else { return }
+        note("video: refresh requested")
+        video.requestKeyframe()
     }
 
     // MARK: Picture quality
