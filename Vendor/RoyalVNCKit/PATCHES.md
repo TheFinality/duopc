@@ -40,3 +40,8 @@ Only `Sources/{RoyalVNCKit,RoyalVNCKitC,Z,d3des}` and `LICENSE` were copied. Eve
    framebuffer while it's being written.
 11. `VNCGatewaySettings.tlsOptions(pinning:onMismatch:)` (`SDK/VNCGateway.swift`) is the public home of patch 8's pinned TLS 1.3
    options, used by the VNC connection and by DuoPC's video stream, so there's one implementation of the certificate check.
+12. Waiting for a route (`SDK/Connection/VNCConnection.swift`, `SDK/VNCGateway.swift`): a connection that iOS puts in
+   `.waiting` with ENETDOWN ("Network is down": no route for the app yet, as just after a restart, or a setting blocks
+   it) used to fail at once, although `NWConnection` retries by itself when a route appears. It now gets 15 seconds
+   (`routeWaitSeconds`, armed once through `VNCOneShot`) before failing with the latest error. Other waiting errors
+   (refused, unreachable) still fail at once.

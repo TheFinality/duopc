@@ -46,6 +46,9 @@ public final class VNCConnection: NSObjectOrAnyObject {
 	public var jpegQualityLevel = 6
 	public var compressionLevel = 5
 	let gatewayPinCheck = VNCGatewayPinCheck()
+	// LOCAL PATCH: armed by the first wait for a network route (see connectionStatusDidChange).
+	let routeWait = VNCOneShot()
+	static let routeWaitSeconds: Double = 15
 
 #if canImport(ObjectiveC)
 	@objc
@@ -366,7 +369,17 @@ private extension VNCConnection {
 			case .waiting(let error):
 				logger.logDebug("Connection State - Waiting with error: \(error)")
 
-				connectionDidFail(error: .connection(.failed(error)))
+				// LOCAL PATCH: with no route yet (ENETDOWN: just after a restart, or a setting blocks
+				// the app) the connection retries by itself once one appears; give it a while first.
+				guard Self.isNoRoute(error) else {
+					connectionDidFail(error: .connection(.failed(error)))
+					return
+				}
+				guard routeWait.arm() else { return }
+				queue.asyncAfter(deadline: .now() + Self.routeWaitSeconds) { [weak self] in
+					guard let self, case .waiting(let latest) = self.connection.status else { return }
+					self.connectionDidFail(error: .connection(.failed(latest)))
+				}
 
 			case .failed(let error):
 				logger.logDebug("Connection State - Failed with error: \(error)")
@@ -400,6 +413,15 @@ private extension VNCConnection {
 			startReceiveLoop()
 			startSendLoop()
 		}
+	}
+
+	// LOCAL PATCH: "Network is down": no route at all, as opposed to the server refusing or not answering.
+	static func isNoRoute(_ error: Error) -> Bool {
+#if canImport(Network)
+		if let error = error as? NWError, case .posix(let code) = error { return code == .ENETDOWN }
+#endif
+		let ns = error as NSError
+		return ns.domain == NSPOSIXErrorDomain && ns.code == Int(ENETDOWN)
 	}
 
 	func connectionDidFail(error: VNCError) {

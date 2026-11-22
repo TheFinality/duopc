@@ -2,6 +2,7 @@ import Testing
 import CoreGraphics
 import Foundation
 import IOSurface
+import Network
 import UIKit
 @testable import DuoRemote
 
@@ -216,6 +217,21 @@ struct StreamWireTests {
         #expect(b.roundTripMs == 140 && b.capKbps == 12_000)
         #expect(b.isStrained)                          // 115 ms queued on top of the best round trip
         #expect(VideoStats(payload: Data([1, 2, 3])) == nil)
+    }
+
+    @Test func networkDownIsToldApartFromOtherFailures() {
+        #expect(NetworkAdvice.isNoRoute(NWError.posix(.ENETDOWN)))
+        #expect(NetworkAdvice.isNoRoute(NSError(domain: NSPOSIXErrorDomain, code: Int(ENETDOWN))))
+        #expect(!NetworkAdvice.isNoRoute(NWError.posix(.ECONNREFUSED)))
+        #expect(!NetworkAdvice.isNoRoute(NWError.posix(.ETIMEDOUT)))
+    }
+
+    @Test func networkDownNamesTheBlockingSetting() {
+        #expect(NetworkAdvice.message(for: .cellularDenied).contains("Settings → Cellular"))
+        #expect(NetworkAdvice.message(for: .wifiDenied).contains("Wireless Data"))
+        #expect(NetworkAdvice.message(for: .localNetworkDenied).contains("Local Network"))
+        #expect(NetworkAdvice.message(for: .vpnInactive).contains("VPN"))
+        #expect(NetworkAdvice.message(for: nil).contains("Settings → Cellular"))
     }
 
     @Test func adtsHeaderGivesTheDecoderItsConfig() throws {

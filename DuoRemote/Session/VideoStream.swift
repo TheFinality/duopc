@@ -99,6 +99,7 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
     private var failedFrames = 0
     private var finished = false
     private var closing = false
+    private var routeWait: DispatchWorkItem?
 
     init(host: String, port: UInt16, gateway: VNCGatewaySettings, bitrateKbps: Int, fps: Int, sound: Bool, autoQuality: Bool) {
         token = gateway.token
@@ -213,6 +214,7 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
     private func stateChanged(_ state: NWConnection.State) {
         switch state {
         case .ready:
+            routeWait?.cancel()
             // "DPC2" + token + channel 2 (video); then the gateway answers with one byte.
             var hello = Data("DPC2".utf8)
             hello.append(token)
@@ -230,7 +232,20 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
                 default: finish(.unavailable)
                 }
             }
+        case .waiting(let error) where NetworkAdvice.isNoRoute(error) || connection.currentPath?.status == .unsatisfied:
+            // iOS has no route for this app yet (just after a restart, or a setting blocks it) and
+            // retries by itself when one appears: wait a while before calling it a failure.
+            guard routeWait == nil else { break }
+            let reason = connection.currentPath?.unsatisfiedReason
+            onEvent?(.log("waiting for a network route (\(reason.map { "\($0)" } ?? "no reason given"))"))
+            let wait = DispatchWorkItem { [weak self] in
+                guard let self, case .waiting = connection.state else { return }
+                finish(.network(NetworkAdvice.message(for: connection.currentPath?.unsatisfiedReason)))
+            }
+            routeWait = wait
+            queue.asyncAfter(deadline: .now() + NetworkAdvice.routeWait, execute: wait)
         case .waiting(let error), .failed(let error):
+            routeWait?.cancel()
             finish(pinMismatch.withLock { $0 } ? .certificateMismatch : .network(error.localizedDescription))
         case .cancelled:
             finish(closing ? nil : .closed)
@@ -307,7 +322,11 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
         connection.receive(minimumIncompleteLength: count, maximumLength: count) { [weak self] data, _, isComplete, error in
             guard let self else { return }
             if let data, data.count == count { return then(data) }
-            if let error { return finish(.network(error.localizedDescription)) }
+            if let error {
+                return finish(.network(NetworkAdvice.isNoRoute(error)
+                                       ? NetworkAdvice.message(for: connection.currentPath?.unsatisfiedReason)
+                                       : error.localizedDescription))
+            }
             if isComplete { return finish(.closed) }
             finish(.network("The connection to the PC was cut short."))
         }
@@ -316,10 +335,40 @@ nonisolated final class VideoStream: RemoteLink, @unchecked Sendable {
     private func finish(_ failure: Failure?) {
         guard !finished else { return }
         finished = true
+        routeWait?.cancel()
         decoder = nil
         sound = nil
         connection.cancel()
         onEvent?(.closed(closing ? nil : failure))
+    }
+}
+
+/// iOS's "Network is down" (POSIX ENETDOWN, shown as error 50) means it won't give the app a
+/// route at all: usually a setting that blocks DuoPC, not the PC or the network. Says which.
+nonisolated enum NetworkAdvice {
+    /// How long a connection may wait for a route before it's reported as failed.
+    static let routeWait: TimeInterval = 15
+
+    static func message(for reason: NWPath.UnsatisfiedReason?) -> String {
+        switch reason {
+        case .cellularDenied?:
+            "iOS isn't letting DuoPC use mobile data. Turn on DuoPC in Settings → Cellular, then try again."
+        case .wifiDenied?:
+            "iOS isn't letting DuoPC use Wi-Fi. In Settings → Apps → DuoPC → Wireless Data, choose WLAN & Cellular Data."
+        case .localNetworkDenied?:
+            "iOS isn't letting DuoPC reach devices on your network. Turn on DuoPC in Settings → Privacy & Security → Local Network."
+        case .vpnInactive?:
+            "A VPN on this iPhone should carry this connection but isn't connected. Connect it, or turn it off in Settings → VPN."
+        default:
+            "iOS isn't giving DuoPC a network connection. Check Wi-Fi or mobile data, and that DuoPC is on in Settings → Cellular."
+        }
+    }
+
+    /// The no-route error, as opposed to the PC refusing or not answering.
+    static func isNoRoute(_ error: Error) -> Bool {
+        if let error = error as? NWError, case .posix(let code) = error { return code == .ENETDOWN }
+        let ns = error as NSError
+        return ns.domain == NSPOSIXErrorDomain && ns.code == Int(ENETDOWN)
     }
 }
 

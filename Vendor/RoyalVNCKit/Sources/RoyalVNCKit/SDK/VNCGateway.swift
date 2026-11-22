@@ -51,6 +51,19 @@ final class VNCGatewayPinCheck: @unchecked Sendable {
 	}
 }
 
+/// True the first time `arm()` is called, false after. LOCAL PATCH 12.
+final class VNCOneShot: @unchecked Sendable {
+	private let lock = NSLock()
+	private var armed = false
+
+	func arm() -> Bool {
+		lock.lock(); defer { lock.unlock() }
+		guard !armed else { return false }
+		armed = true
+		return true
+	}
+}
+
 #if canImport(Network)
 public extension VNCGatewaySettings {
 	/// TLS 1.3 that trusts exactly one certificate: the one whose DER bytes hash to `pin`. No certificate
